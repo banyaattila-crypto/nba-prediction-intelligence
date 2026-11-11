@@ -89,3 +89,60 @@ def test_brier_score():
     ]
     brier = calculate_brier_score(sample_preds)
     assert brier == 0.04
+
+from app.quant.shin import shin_devig_two_way
+from app.quant.elo import (
+    calculate_elo_win_prob,
+    calculate_mov_multiplier,
+    update_elo,
+    calculate_four_factors_rating
+)
+from app.quant.player_props import simulate_player_prop
+
+def test_shin_devig():
+    # Symmetric odds
+    fair_a, fair_b, z, vig = shin_devig_two_way(1.91, 1.91)
+    assert abs(fair_a - 0.50) < 0.01
+    assert abs(fair_b - 0.50) < 0.01
+    assert vig > 4.0
+    
+    # Asymmetric odds (heavy favorite)
+    f_fav, f_dog, z_asym, vig_asym = shin_devig_two_way(1.20, 5.0)
+    assert f_fav > 0.75
+    assert f_dog < 0.25
+    assert abs((f_fav + f_dog) - 1.0) < 0.001
+
+def test_elo_win_prob_and_update():
+    # Equal Elo with Home Court Advantage (HCA = 65)
+    p_home, p_away = calculate_elo_win_prob(1500, 1500, hca=65)
+    assert p_home > 0.55
+    assert p_away < 0.45
+    
+    # Update Elo on blowout
+    new_h, new_a, shift = update_elo(1500, 1500, home_score=125, away_score=100)
+    assert new_h > 1500
+    assert new_a < 1500
+    assert shift > 5.0
+
+def test_four_factors_rating():
+    # Elite shooting and low turnovers
+    rating = calculate_four_factors_rating(efg_pct=0.58, tov_pct=0.10, orb_pct=0.28, ft_rate=0.22)
+    assert rating > 2.0
+
+def test_player_prop_simulation():
+    res = simulate_player_prop(
+        player_name="Jayson Tatum",
+        team="BOS",
+        stat_type="POINTS",
+        line=26.5,
+        over_odds=1.91,
+        under_odds=1.91,
+        expected_stat_per_36=28.0,
+        projected_minutes=35.0,
+        simulations_count=5000,
+        seed=42
+    )
+    assert "p_over" in res
+    assert "p_under" in res
+    assert res["expected_mean"] > 20.0
+    assert (res["p_over"] + res["p_under"]) > 0.90
