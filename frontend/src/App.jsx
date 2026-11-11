@@ -6,7 +6,7 @@ import PicksView from './components/PicksView'
 import PerformanceView from './components/PerformanceView'
 import StandingsView from './components/StandingsView'
 import MethodologyModal from './components/MethodologyModal'
-import { Activity, Flame, ShieldAlert, Sparkles, RefreshCw } from 'lucide-react'
+import { Activity, Flame, ShieldAlert, Sparkles, RefreshCw, Zap, TrendingUp, Cpu, Award } from 'lucide-react'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('games')
@@ -78,8 +78,7 @@ export default function App() {
         body: JSON.stringify(pick)
       })
       if (res.ok) {
-        showToast(`Tipp hozzáadva a követett portfólióhoz: ${pick.selection}`)
-        // Refresh performance and history
+        showToast(`Tipp hozzáadva a követett szimulált bankrollhoz: ${pick.selection}`)
         const histRes = await fetch('/api/history')
         if (histRes.ok) setHistory(await histRes.json())
         const perfRes = await fetch('/api/performance')
@@ -90,12 +89,16 @@ export default function App() {
     }
   }
 
+  const liveCount = games.filter(g => g.status === 'in_progress').length
+  const bestEdgePick = topPicks.length > 0 ? topPicks[0] : null
+
   return (
-    <div className="min-h-screen bg-[#080d1a] flex flex-col">
-      {/* Toast */}
+    <div className="min-h-screen bg-dark-950 text-slate-100 flex flex-col relative selection:bg-cyan-500 selection:text-black">
+      
+      {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs font-semibold flex items-center space-x-2 animate-bounce">
-          <span>✓</span>
+        <div className="fixed bottom-6 right-6 z-50 glass-card bg-emerald-950/80 border border-emerald-500/50 text-emerald-200 px-5 py-3 rounded-2xl shadow-glow-emerald text-xs font-mono font-bold flex items-center space-x-2.5 animate-fadeIn">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -104,63 +107,97 @@ export default function App() {
       <Navbar 
         activeTab={activeTab} 
         setActiveTab={setActiveTab} 
-        onOpenMethodology={() => setShowMethodology(true)} 
+        onOpenMethodology={() => setShowMethodology(true)}
+        liveGamesCount={liveCount}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-7">
         
-        {/* Top Intelligence Hero Strip */}
-        <div className="mb-6 bg-gradient-to-r from-[#121c33] via-[#0f172a] to-[#121c33] border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
-          <div>
-            <div className="flex items-center space-x-2 mb-1">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <h1 className="text-base font-extrabold text-white">
-                Mai NBA Mérkőzések & Statisztikai Előrejelzések
+        {/* Dynamic Quant Hero Strip */}
+        <div className="mb-8 glass-panel rounded-3xl p-6 sm:p-7 border border-white/[0.08] relative overflow-hidden shadow-glass">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-radial from-cyan-500/10 via-blue-600/5 to-transparent blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-80 h-80 bg-gradient-radial from-indigo-600/10 to-transparent blur-3xl pointer-events-none" />
+          
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+            <div>
+              <div className="flex items-center space-x-2.5 mb-2">
+                <span className="text-[10px] font-mono font-black tracking-widest uppercase bg-gradient-to-r from-cyan-500 to-blue-600 text-white px-2.5 py-0.5 rounded-md shadow-glow-cyan">
+                  QUANTITATIVE BETTING INTELLIGENCE
+                </span>
+                <span className="text-xs text-slate-400 font-mono hidden sm:inline">· 2026-27 Alapszakasz</span>
+              </div>
+              <h1 className="font-display font-black text-2xl sm:text-3xl text-white tracking-tight">
+                NBA Mérkőzéselemző & Algoritmikus Értékkereső
               </h1>
-            </div>
-            <p className="text-xs text-slate-400">
-              Valós idejű bukmékeri oddsok (DraftKings/Caesars), Vig-mentesítés, és 10 000 Monte Carlo mérkőzésszimuláció.
-            </p>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 text-xs font-mono bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-800 text-slate-300">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>{games.length} Mérkőzés</span>
-              <span className="text-slate-400">|</span>
-              <span className="text-emerald-400 font-bold">{topPicks.length} +EV lehetőség</span>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                Valós idejű bukmékeri oddsok, dinamikus csapat-hatékonyság (ORtg/DRtg), rotációs sérülésjelentések és 10 000 Monte Carlo meccsszimuláció.
+              </p>
             </div>
 
-            <button
-              onClick={loadData}
-              disabled={refreshing}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition"
-              title="Adatok frissítése"
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-blue-400' : ''}`} />
-            </button>
+            {/* Quick Metrics Bar & Refresh Button */}
+            <div className="flex items-center space-x-3 flex-wrap sm:flex-nowrap">
+              <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+                <div className="bg-dark-900/90 border border-white/[0.08] px-3.5 py-2 rounded-xl text-center">
+                  <span className="text-[10px] text-slate-400 block">Játéknap</span>
+                  <span className="font-bold text-cyan-400 text-sm">{games.length} Meccs</span>
+                </div>
+                <div className="bg-dark-900/90 border border-white/[0.08] px-3.5 py-2 rounded-xl text-center">
+                  <span className="text-[10px] text-slate-400 block">Pozitív EV</span>
+                  <span className="font-bold text-emerald-400 text-sm">{topPicks.length} Piac</span>
+                </div>
+              </div>
+
+              <button
+                onClick={loadData}
+                disabled={refreshing}
+                className="p-3 rounded-2xl bg-dark-900 hover:bg-dark-800 text-slate-300 hover:text-white border border-white/[0.08] hover:border-cyan-500/40 shadow-sm transition-all"
+                title="Adatok és szimulációk frissítése"
+              >
+                <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin text-cyan-400' : 'text-slate-300'}`} />
+              </button>
+            </div>
           </div>
+
+          {/* Quick Highlight Banner if top edge exists */}
+          {bestEdgePick && (
+            <div className="mt-5 pt-4 border-t border-white/[0.05] flex items-center justify-between text-xs font-mono relative z-10">
+              <div className="flex items-center space-x-2 text-slate-300">
+                <Flame className="w-4 h-4 text-amber-400" />
+                <span className="text-slate-400">Nap Legjobb Matematikai Éléke:</span>
+                <strong className="text-white">{bestEdgePick.game_matchup}</strong>
+                <span className="text-cyan-400 font-bold">{bestEdgePick.selection}</span>
+                <span className="text-slate-400">@{bestEdgePick.bookmaker_odds.toFixed(2)}</span>
+              </div>
+              <span className="neon-pill-emerald px-2.5 py-0.5 rounded-lg font-bold text-[11px] hidden sm:inline">
+                +{bestEdgePick.edge}% Edge (EV: +{bestEdgePick.ev}%)
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Tab 1: Games List */}
         {activeTab === 'games' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">
-                Játéknap Menetrend (Helyi Idő szerint)
-              </h2>
-              <span className="text-xs text-slate-400">
-                Kattints bármelyik mérkőzésre a 10 000 Monte Carlo lefutás és sérülések megtekintéséhez
+              <div className="flex items-center space-x-2">
+                <Activity className="w-4 h-4 text-cyan-400" />
+                <h2 className="font-display font-extrabold text-base uppercase tracking-wider text-white">
+                  Játéknap Menetrend & Oddsok
+                </h2>
+              </div>
+              <span className="text-xs font-mono text-slate-400">
+                Kattints bármelyik mérkőzésre a 10 000 Monte Carlo lefutásért
               </span>
             </div>
 
             {loading ? (
-              <div className="text-center py-20 text-slate-400 text-sm">
-                Adatok és szimulációk betöltése...
+              <div className="text-center py-24 text-slate-400 font-mono text-sm">
+                <RefreshCw className="w-8 h-8 text-cyan-400 animate-spin mx-auto mb-3" />
+                <span>Adatok, sérülések és szimulációk betöltése...</span>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {games.map((g) => {
                   const matchTopPick = topPicks.find(p => p.game_id === g.id)
                   return (
@@ -203,12 +240,16 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-[#070b16] py-6 px-4 text-center text-xs text-slate-400 space-y-2">
-        <p>
-          NBA Prediction & Betting Intelligence Platform · Kvantitatív döntéstámogatás sportfogadási piacokon
-        </p>
-        <p className="text-[11px] text-slate-400">
-          A rendszer nem garantál nyereséget. A sportfogadás pénzügyi kockázattal jár, játssz felelősséggel!
+      <footer className="border-t border-white/[0.06] bg-dark-950/90 py-8 px-4 text-center text-xs font-mono text-slate-500 space-y-2 mt-12">
+        <div className="flex items-center justify-center space-x-3 text-slate-400">
+          <span className="text-cyan-400 font-bold">NBA QUANT INTELLIGENCE v1.2</span>
+          <span>·</span>
+          <span>Vig-mentesített Monte Carlo Döntéstámogatás</span>
+          <span>·</span>
+          <span>DraftKings & Caesars Odds Feeds</span>
+        </div>
+        <p className="text-[11px] text-slate-600 max-w-xl mx-auto">
+          A rendszer valószínűségi modelleket kalkulál, nem garantál pénzügyi nyereséget. A sportfogadás kockázattal jár, játssz felelősséggel!
         </p>
       </footer>
 

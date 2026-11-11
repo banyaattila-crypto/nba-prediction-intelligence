@@ -1,11 +1,11 @@
 import React from 'react'
-import { Award, TrendingUp, BarChart2, CheckCircle2, XCircle, ArrowUpRight, ShieldCheck, HelpCircle } from 'lucide-react'
+import { Award, TrendingUp, BarChart2, CheckCircle2, XCircle, ArrowUpRight, ShieldCheck, HelpCircle, Activity } from 'lucide-react'
 
 export default function PerformanceView({ performance, history }) {
   if (!performance) {
     return (
-      <div className="text-center py-12 text-slate-400">
-        Teljesítménymutatók betöltése folyamatban...
+      <div className="text-center py-20 text-slate-400 font-mono text-sm">
+        Teljesítménymutatók kalkulálása folyamatban...
       </div>
     )
   }
@@ -29,141 +29,181 @@ export default function PerformanceView({ performance, history }) {
     <div className="space-y-6">
 
       {/* Top Banner: Verification Notice */}
-      <div className="bg-gradient-to-r from-blue-900/30 to-indigo-900/20 border border-blue-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-500/40 flex items-center justify-center">
-            <ShieldCheck className="w-6 h-6 text-blue-400" />
+      <div className="glass-panel p-6 rounded-3xl border border-white/[0.08] relative overflow-hidden shadow-glass">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-radial from-cyan-500/10 to-transparent blur-3xl pointer-events-none" />
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center shadow-glow-cyan">
+              <ShieldCheck className="w-6 h-6 text-cyan-400" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <h3 className="font-display font-extrabold text-lg text-white">
+                  Objektív, Auditált Teljesítmény & Backtest
+                </h3>
+                <span className="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                  ZÉRÓ LOOK-AHEAD BIAS
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
+                Minden ajánlás időbélyeggel rögzített. A modell szigorúan csak a feldobás előtti oddsokat és sérülésadatokat használja, utólagos módosítási lehetőség nélkül.
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-sm font-bold text-white">Objektív, Nem Manipulálható Teljesítménykövetés</h3>
-            <p className="text-xs text-slate-400">
-              Minden ajánlás időbélyeggel rögzített. A modell kizárólag a mérkőzés előtt ismert adatokból kalkulál (zéró look-ahead bias).
-            </p>
+
+          <div className="flex items-center space-x-3">
+            <div className="bg-dark-900/90 border border-white/[0.08] px-4 py-2.5 rounded-2xl font-mono text-xs">
+              <span className="text-slate-400 block text-[10px]">Pozitív CLV Arány</span>
+              <span className="text-emerald-400 font-black text-sm">+{clv_positive_rate}%</span>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center space-x-2">
-          <span className="text-xs font-mono bg-blue-500/20 text-blue-300 px-3 py-1 rounded-lg border border-blue-500/30">
-            CLV Ráta: <strong>+{clv_positive_rate}%</strong>
-          </span>
         </div>
       </div>
 
       {/* Primary KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        
         {/* Total Profit */}
-        <div className="bg-[#11192e] border border-slate-800 p-4 rounded-2xl">
-          <span className="text-xs text-slate-400 font-medium">Kumulált Profit / Veszteség</span>
-          <div className="text-2xl font-black font-mono text-emerald-400 mt-1 flex items-baseline space-x-1">
+        <div className="glass-card p-5 rounded-2xl border border-white/[0.08] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl pointer-events-none" />
+          <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">Kumulált Profit</span>
+          <div className="text-3xl font-display font-black font-mono text-emerald-400 mt-2 flex items-baseline space-x-1.5">
             <span>{total_profit_units >= 0 ? `+${total_profit_units.toFixed(2)}` : total_profit_units.toFixed(2)}</span>
-            <span className="text-xs font-normal text-slate-400">Unit</span>
+            <span className="text-xs font-mono font-normal text-slate-400">Unit</span>
           </div>
-          <span className="text-[11px] text-slate-400 font-mono mt-1 block">Össz. feltett: {total_units_staked.toFixed(1)}u</span>
-        </div>
-
-        {/* ROI / Yield */}
-        <div className="bg-[#11192e] border border-slate-800 p-4 rounded-2xl">
-          <span className="text-xs text-slate-400 font-medium">ROI (Hozam)</span>
-          <div className="text-2xl font-black font-mono text-blue-400 mt-1">
-            {roi_percent >= 0 ? `+${roi_percent.toFixed(1)}%` : `${roi_percent.toFixed(1)}%`}
-          </div>
-          <span className="text-[11px] text-slate-400 font-mono mt-1 block">Yield egységnyi téten</span>
-        </div>
-
-        {/* Win Rate */}
-        <div className="bg-[#11192e] border border-slate-800 p-4 rounded-2xl">
-          <span className="text-xs text-slate-400 font-medium">Találati Arány (Win Rate)</span>
-          <div className="text-2xl font-black font-mono text-white mt-1">
-            {win_rate.toFixed(1)}%
-          </div>
-          <span className="text-[11px] text-slate-400 font-mono mt-1 block">{won_picks}W - {lost_picks}L ({completed_picks} meccs)</span>
-        </div>
-
-        {/* Brier Score */}
-        <div className="bg-[#11192e] border border-slate-800 p-4 rounded-2xl">
-          <span className="text-xs text-slate-400 font-medium">Brier-Score (Pontosság)</span>
-          <div className="text-2xl font-black font-mono text-amber-400 mt-1">
-            {brier_score.toFixed(3)}
-          </div>
-          <span className="text-[11px] text-slate-400 font-mono mt-1 block">Alacsonyabb = jobb (Coin toss: 0.250)</span>
-        </div>
-      </div>
-
-      {/* Model Calibration Curve Visualizer */}
-      <div className="bg-[#11192e] border border-slate-800 p-5 rounded-2xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-          <div>
-            <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-              <BarChart2 className="w-4 h-4 text-emerald-400" />
-              <span>Modell Valószínűség-Kalibrációs Görbe (Reliability Diagram)</span>
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Ha a modell 60% esélyt jósol, vajon tényleg ~60%-ban nyernek-e a tippek?
-            </p>
-          </div>
-          <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
-            Jól kalibrált eloszlás
+          <span className="text-[11px] text-slate-400 font-mono mt-1.5 block">
+            Összes tét: {total_units_staked.toFixed(1)}u
           </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-          {calibration_data.map((bin, i) => (
-            <div key={i} className="bg-[#0c1424] border border-slate-800/80 p-3 rounded-xl text-center">
-              <span className="text-xs font-mono text-slate-400 font-semibold block">{bin.bucket}</span>
-              
-              <div className="my-2 space-y-1">
-                <div className="text-xs text-slate-400">
-                  Jósolt: <span className="font-mono text-slate-200">{bin.avg_pred_prob}%</span>
+        {/* ROI / Yield */}
+        <div className="glass-card p-5 rounded-2xl border border-white/[0.08] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-xl pointer-events-none" />
+          <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">ROI (Yield)</span>
+          <div className="text-3xl font-display font-black font-mono text-cyan-400 mt-2">
+            {roi_percent >= 0 ? `+${roi_percent.toFixed(1)}%` : `${roi_percent.toFixed(1)}%`}
+          </div>
+          <span className="text-[11px] text-slate-400 font-mono mt-1.5 block">
+            Hozam egységnyi téten
+          </span>
+        </div>
+
+        {/* Win Rate */}
+        <div className="glass-card p-5 rounded-2xl border border-white/[0.08] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full blur-xl pointer-events-none" />
+          <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">Találati Arány</span>
+          <div className="text-3xl font-display font-black font-mono text-white mt-2">
+            {win_rate.toFixed(1)}%
+          </div>
+          <span className="text-[11px] text-slate-400 font-mono mt-1.5 block">
+            {won_picks}W - {lost_picks}L ({completed_picks} meccs)
+          </span>
+        </div>
+
+        {/* Brier Score */}
+        <div className="glass-card p-5 rounded-2xl border border-white/[0.08] relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none" />
+          <span className="text-xs font-mono font-bold text-slate-400 uppercase tracking-wider">Brier-Score</span>
+          <div className="text-3xl font-display font-black font-mono text-amber-400 mt-2">
+            {brier_score.toFixed(3)}
+          </div>
+          <span className="text-[11px] text-slate-400 font-mono mt-1.5 block">
+            Alacsonyabb = jobb (Coin toss: 0.250)
+          </span>
+        </div>
+
+      </div>
+
+      {/* Model Calibration Curve Visualizer */}
+      <div className="glass-card p-6 sm:p-7 rounded-3xl border border-white/[0.08]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <div>
+            <h3 className="font-display font-bold text-lg text-white flex items-center space-x-2.5">
+              <BarChart2 className="w-5 h-5 text-emerald-400" />
+              <span>Valószínűség-Kalibrációs Görbe (Reliability Diagram)</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-1">
+              A modell által becsült valószínűség (pl. 60-70%) összehasonlítása az empirikusan megfigyelt nyerési aránnyal
+            </p>
+          </div>
+          <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-xl shadow-glow-emerald">
+            ✓ Jó eloszlási kalibráció
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3.5">
+          {calibration_data.map((bin, i) => {
+            const isGood = Math.abs(bin.delta) <= 5.0
+            return (
+              <div key={i} className="bg-dark-900/90 border border-white/[0.06] p-4 rounded-2xl text-center shadow-inner">
+                <span className="text-xs font-mono font-extrabold text-cyan-400 block mb-2">
+                  {bin.bucket}
+                </span>
+                
+                <div className="my-2 space-y-1">
+                  <div className="text-[11px] text-slate-400 font-mono">
+                    Jósolt: <strong className="text-slate-200">{bin.avg_pred_prob}%</strong>
+                  </div>
+                  <div className="text-lg font-black font-mono text-white">
+                    Valós: <span className="text-emerald-400">{bin.actual_win_rate}%</span>
+                  </div>
                 </div>
-                <div className="text-sm font-black font-mono text-emerald-400">
-                  Valós: {bin.actual_win_rate}%
+
+                <div className="mt-3 pt-2.5 border-t border-white/[0.05] flex items-center justify-between text-[10px] font-mono text-slate-400">
+                  <span>{bin.count} tipp</span>
+                  <span className={isGood ? 'text-emerald-400 font-bold' : 'text-amber-400'}>
+                    Δ {bin.delta >= 0 ? `+${bin.delta}%` : `${bin.delta}%`}
+                  </span>
                 </div>
               </div>
-
-              <span className="text-[10px] text-slate-400 font-mono">
-                {bin.count} tipp ({bin.delta >= 0 ? `+${bin.delta}%` : `${bin.delta}%`})
-              </span>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
       {/* Historical Ledger Table */}
-      <div className="bg-[#11192e] border border-slate-800 rounded-2xl overflow-hidden">
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-white">Historikus Tippnapló (Audit Trail)</h3>
-          <span className="text-xs text-slate-400 font-mono">Összesen: {history.length} tipp</span>
+      <div className="glass-card rounded-3xl border border-white/[0.08] overflow-hidden shadow-glass">
+        <div className="p-5 border-b border-white/[0.06] flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Activity className="w-4 h-4 text-cyan-400" />
+            <h3 className="font-display font-bold text-base text-white">
+              Historikus Tippnapló & Audit Trail
+            </h3>
+          </div>
+          <span className="text-xs font-mono text-slate-400">{history.length} auditált tipp</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-[#0b1220] text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+            <thead className="bg-dark-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-white/[0.06]">
               <tr>
-                <th className="py-3 px-4">Dátum</th>
-                <th className="py-3 px-4">Meccs</th>
-                <th className="py-3 px-4">Piac</th>
-                <th className="py-3 px-4">Kiválasztás</th>
-                <th className="py-3 px-4 text-right">Odds</th>
-                <th className="py-3 px-4 text-right">Modell Esély</th>
-                <th className="py-3 px-4 text-right">Edge</th>
-                <th className="py-3 px-4 text-right">Záró Odds (CLV)</th>
-                <th className="py-3 px-4 text-center">Eredmény</th>
-                <th className="py-3 px-4 text-right">P/L (Units)</th>
+                <th className="py-3.5 px-4 font-bold">Dátum</th>
+                <th className="py-3.5 px-4 font-bold">Meccs</th>
+                <th className="py-3.5 px-4 font-bold">Piac</th>
+                <th className="py-3.5 px-4 font-bold">Kiválasztás</th>
+                <th className="py-3.5 px-4 text-right font-bold">Odds</th>
+                <th className="py-3.5 px-4 text-right font-bold">Modell</th>
+                <th className="py-3.5 px-4 text-right font-bold">Edge</th>
+                <th className="py-3.5 px-4 text-right font-bold">Záró Odds (CLV)</th>
+                <th className="py-3.5 px-4 text-center font-bold">Eredmény</th>
+                <th className="py-3.5 px-4 text-right font-bold">P/L (Units)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60 text-slate-200">
+            <tbody className="divide-y divide-white/[0.04] text-slate-200">
               {history.map((h) => {
                 const isWon = h.result === 'WON'
                 const isLost = h.result === 'LOST'
                 return (
-                  <tr key={h.id} className="hover:bg-slate-800/30 transition">
-                    <td className="py-3 px-4 text-slate-400">{h.date}</td>
-                    <td className="py-3 px-4 font-bold text-white">{h.matchup}</td>
-                    <td className="py-3 px-4 text-slate-400">{h.market}</td>
-                    <td className="py-3 px-4 font-medium text-slate-200">{h.selection}</td>
-                    <td className="py-3 px-4 text-right text-blue-400">{h.odds.toFixed(2)}</td>
-                    <td className="py-3 px-4 text-right text-slate-300">{(h.model_prob * 100).toFixed(1)}%</td>
-                    <td className="py-3 px-4 text-right text-emerald-400">+{h.edge.toFixed(1)}%</td>
-                    <td className="py-3 px-4 text-right text-slate-400">
+                  <tr key={h.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="py-3.5 px-4 text-slate-400">{h.date}</td>
+                    <td className="py-3.5 px-4 font-bold text-white">{h.matchup}</td>
+                    <td className="py-3.5 px-4 text-slate-400">{h.market}</td>
+                    <td className="py-3.5 px-4 font-semibold text-slate-100">{h.selection}</td>
+                    <td className="py-3.5 px-4 text-right text-cyan-400 font-bold">{h.odds.toFixed(2)}</td>
+                    <td className="py-3.5 px-4 text-right text-slate-300">{(h.model_prob * 100).toFixed(1)}%</td>
+                    <td className="py-3.5 px-4 text-right text-emerald-400 font-bold">+{h.edge.toFixed(1)}%</td>
+                    <td className="py-3.5 px-4 text-right text-slate-400">
                       {h.closing_odds ? (
                         <span className="flex items-center justify-end space-x-1">
                           <span>{h.closing_odds.toFixed(2)}</span>
@@ -171,17 +211,17 @@ export default function PerformanceView({ performance, history }) {
                         </span>
                       ) : '-'}
                     </td>
-                    <td className="py-3 px-4 text-center">
-                      <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-bold ${
-                        isWon ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-                        isLost ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' :
-                        'bg-slate-800 text-slate-400'
+                    <td className="py-3.5 px-4 text-center">
+                      <span className={`inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                        isWon ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                        isLost ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
+                        'bg-dark-950 text-slate-400'
                       }`}>
-                        {isWon ? <CheckCircle2 className="w-3 h-3" /> : isLost ? <XCircle className="w-3 h-3" /> : null}
+                        {isWon ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> : isLost ? <XCircle className="w-3 h-3 text-rose-400" /> : null}
                         <span>{h.result}</span>
                       </span>
                     </td>
-                    <td className={`py-3 px-4 text-right font-bold ${
+                    <td className={`py-3.5 px-4 text-right font-black ${
                       h.profit_loss > 0 ? 'text-emerald-400' : h.profit_loss < 0 ? 'text-rose-400' : 'text-slate-400'
                     }`}>
                       {h.profit_loss > 0 ? `+${h.profit_loss.toFixed(2)}` : h.profit_loss.toFixed(2)}
