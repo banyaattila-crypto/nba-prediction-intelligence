@@ -1,117 +1,74 @@
 # NBA Prediction & Betting Intelligence App — Állapotjelentés (Status Report)
 
 **Dátum:** 2026. november 11.  
-**Verzió:** 1.0.0 (MVP)  
-**Státusz:** Működőképes, tesztelt produkciós prototípus  
+**Verzió:** 1.2.0 (Pro Quant & Visual Overhaul)  
+**GitHub Repozitórium:** [https://github.com/banyaattila-crypto/nba-prediction-intelligence](https://github.com/banyaattila-crypto/nba-prediction-intelligence)  
+**Státusz:** Működőképes, tesztelt produkciós prototípus (17/17 sikeres automatizált teszt)
 
 ---
 
-## 1. Vezetői Összefoglaló (Executive Summary)
+## 1. Drasztikus UI/UX és Dizájn Átdolgozás (Visual Overhaul)
 
-A projekt célja egy olyan modern, mobilbarát és szigorúan adatvezérelt NBA döntéstámogató alkalmazás kifejlesztése volt, amely nem véletlenszerű vagy fekete doboz tippeket ad, hanem:
-1. Matematikailag modellezi a mérkőzések kimenetelét (10 000 futásos Monte Carlo szimulációval).
-2. Eltávolítja a bukmékeri árrést (Vig / Juice), hogy a tiszta fair piaci valószínűségeket kapjuk meg.
-3. Pozitív várható értékű (+EV) lehetőségeket azonosít transzparens él (Edge) és várható érték számításokkal.
-4. Ha nincs statisztikai előny, kategorikusan jelzi a mérkőzés/piac elkerülését („Nincs ajánlható él / PASS”).
-5. Brier-score, megbízhatósági kalibrációs görbe és CLV (Closing Line Value) metrikákkal auditálhatóvá teszi a teljesítményt.
+A felhasználói felületet teljesen átterveztük egy ultra-prémium, sötét tónusú **Cyberpunk / Quant Trading Terminal** stílusra (DexScreener, Linear és Dimers Pro ihletésű high-tech látványvilág):
 
-Az MVP fejlesztési és tesztelési fázisa sikeresen lezárult. A rendszer valós idejű NBA adatokból dolgozik.
+1. **Tipográfia & Esztétika:**
+   - **Outfit** és **Plus Jakarta Sans** modern display betűkészletek kombinálva **JetBrains Mono** numerikus kód- és odds-tipográfiával.
+   - Mélyfekete és sötétkék háttér (`bg-dark-950`), több rétegű ambient neon ragyogással (cyan `#06b6d4`, emerald `#10b981`, electric blue `#3b82f6`, crimson `#f43f5e`).
+   - Finom üveghatású rétegek (**Glassmorphism**: `backdrop-blur-2xl`, 1px áttetsző fehér szegélyek, pulzáló neon-pill címkék).
 
----
-
-## 2. Elvégzett Feladatok és Komponensek
-
-### A. Piackutatás és Benchmark Elemzés
-- Részletesen kielemeztük a megadott referenciaalkalmazásokat:
-  - **BettingPros: Picks & Odds** *(FantasyPros / BettingPros)*
-  - **BetsWall Sports Betting Tips** *(BetsWall Ltd)*
-  - **NBA tippek** *(FindYourBets / NerdyTips)*
-  - **Basketball Betting Tips & Odds** *(Loheden AI Solutions AB)*
-  - **Kvantitatív etalonok:** Dimers & OddsJam (Devigging, Monte Carlo szimulációk, CLV)
-- Elkészült a referencia-összehasonlító mátrix, a legjobb UX-megoldások átvétele és a félrevezető elemek (pl. csillagos önkényes bizalom, „biztos tipp” narratíva) kizárása.
-
-### B. Adatarchitektúra és Adapter Réteg
-- **Adapter minta:** `NBADataProvider` absztrakt interfész, amely lehetővé teszi tetszőleges új forrás (pl. The Odds API, Sportradar) bekötését.
-- **ESPN Public Data Adapter:**
-  - Valós idejű meccsmenetrend, állapotok (Scheduled, Live Q1-Q4, Final), helyi időzónás kezdések.
-  - Hivatalos sérülésjelentések (Out, Questionable, Day-to-Day) mindkét csapatra.
-  - Valós idejű DraftKings / Caesars oddsok (Moneyline, Spread, Over/Under).
-  - 30 csapat ligatáblázata, pontátlagai, kapott pontjai és differenciálja.
-  - Beépített in-memory gyorstárazás (cache) a hálózati terhelés minimalizálására.
-  - Offline tesztelési fallback mechanizmus.
-
-### C. Kvantitatív Modellező Motor (`quant/`)
-- **Dinamikus Csapaterősség és Tempó:**
-  - Offensive Rating (ORtg) és Defensive Rating (DRtg) ligaátlaghoz viszonyítva.
-  - Várható meccstempó (Pace) számítás 48 perces birtoklásokra.
-  - Hazai pálya előny (Home Court Advantage: +2.2 pont / 100 birtoklás).
-  - Pihenőnapok és Back-to-Back (B2B) fáradtsági büntetések (-1.8 hazai, -2.2 idegenbeli B2B levonás).
-  - Sérülés-súlyozási modell (sztárjátékosok VORP/BPM hatása, Questionable státusz bizonytalansági indexe).
-- **10 000 Futásos Vektorizált Monte Carlo Szimuláció:**
-  - NumPy alapú gyors szimuláció (<10 ms).
-  - Pontszórás és tempó-kovariancia kezelése ($\sigma \approx 11.5$).
-  - Pontos Spread fedési és Over/Under CDF valószínűségi eloszlások generálása hisztogrammal.
-- **Piaci Árrés Eltávolítás (Devigging) és Várható Érték (EV):**
-  - Multiplikatív és normált piaci vig-mentesítés ($P_{\text{fair}}$).
-  - Várható Érték: $\text{EV} = [P_{\text{modell}} \cdot (\text{Odds} - 1) - (1 - P_{\text{modell}})] \cdot 100$.
-  - Él: $\text{Edge} = P_{\text{modell}} - P_{\text{fair}}$.
-  - Bankroll-védelem: **0.25x Fractional Kelly** méretezés (0.5 – 2.5 egység).
-- **Backtesting & Kalibráció:**
-  - Brier-Score kalkulátor ($0 \le \text{BS} \le 0.25$).
-  - Kalibrációs görbe (Reliability diagram) 5 valószínűségi sávban (40-50%, 50-60%, 60-70%, 70-80%, 80-100%).
-  - Megmásíthatatlan historikus tippnapló (JSON audit ledger).
-
-### D. REST API Réteg (`backend/`)
-- FastAPI keretrendszer Python 3.12-ben:
-  - `GET /api/games`: Napi mérkőzések és élő státusz.
-  - `GET /api/games/{id}`: Részletes kvantitatív mérkőzéselemzés 10 000 szimulációval és sérülésekkel.
-  - `GET /api/picks`: Értékelt piacok szűrőkkel (piac, min. EV, min. Edge, csak value).
-  - `GET /api/picks/top`: Napi legjobb +EV lehetőségek kiemelése.
-  - `POST /api/picks/track`: Virtuális bankroll követés (paper trading).
-  - `GET /api/performance`: Brier-score, ROI, találati arány és kalibrációs görbe.
-  - `GET /api/standings`: 30 NBA csapat hatékonysági mutatói.
-  - `GET /api/health`: Rendszer- és kvantitatív motor diagnosztika.
-  - Single-binary jellegű frontend kiszolgálás (`dist/` közvetlen mountolása).
-
-### E. Modern Mobilbarát Frontend (`frontend/`)
-- React 18, Vite 6, Tailwind CSS, Lucide ikonok.
-- Reszponzív, modern sötét dizájn (Dark Sports-Analytics téma).
-- Nézetek:
-  1. **Napi Meccsek (Daily Slate):** Meccskártyák valós oddsokkal, kezdési idővel, élő eredményekkel és legfontosabb előrejelzéssel.
-  2. **Részletes Elemző Modal:** 10 000 szimulációs eloszlási hisztogram, sérülésjelentések, kulcsfaktorok, piacok elemzése.
-  3. **Érték Tippek (+EV):** Piacszűrő, minimális él/EV csúszkák, Kelly tétméret, transzparens szöveges indoklások.
-  4. **Validáció & Backtest:** Kumulált unit profit, ROI %, találati arány, Brier-score, kalibrációs diagram, historikus tippnapló.
-  5. **Tabella & Csapatstatisztikák:** Rendezhető mutatók (ORtg, DRtg, Net Rating, Pace, W-L).
-  6. **Kvantitatív Módszertan & Felelős Játék Modal:** Matematikai képletek magyarázata és pénzügyi kockázati figyelmeztetés.
+2. **Átdolgozott Komponensek:**
+   - **Navbar:** Ragyogó logó-badge, élő játéknapi mikroticker (Quant Engine állapot, Monte Carlo futások száma, CET időzóna jelzés), aktív tab neonkiemelés.
+   - **GameCard (Mérkőzéskártya):** Emelt csapatlogók, valós idejű piros pulzáló ÉLŐ állásjelző, interaktív odds-panelek, és dinamikus **Kimeneteli Csata-sáv (Battle Gauge)** az esélyek azonnali vizuális összevetésére.
+   - **GameDetailModal (Aréna Showdown):** Látványos stadionfejléc, egymással szembenéző csapatlogók, **Monte Carlo Valószínűségi Sűrűségfüggvény (PDF)** hisztogram, színkódolt sérüléskártyák (Out, Questionable, Day-to-Day) és vig-mentesített terminál piacok.
+   - **PicksView (Értékkereső Terminál):** Ragyogó szűrőgombok, nagy méretű numerikus Edge % és EV % mutatók, 1-kattintásos követés (paper trade) zöld visszaigazolással.
+   - **PerformanceView (Audit & Backtest):** Nagy méretű KPI panelek neon ragyogással, megbízhatósági kalibrációs diagram és időbélyegzett historikus audit ledger.
+   - **StandingsView (Tabella):** Csapatlogók, rendezhető hatékonysági oszlopok (ORtg, DRtg, Net Rating, Pace), dinamikus színkiemeléssel.
 
 ---
 
-## 3. Tesztelési és Minőségbiztosítási Eredmények
+## 2. Kvantitatív Matematikai Továbbfejlesztések (`quant/`)
 
-Az automatizált Pytest tesztek lefutottak:
+A matematikai motort négy új professzionális kvantitatív modullal bővítettük:
+
+1. **Shin Devigging Algoritmus (`app/quant/shin.py`):**
+   - A standard multiplikatív eljáráson túl bevezettük a tudományos sportfogadási etalonnak számító **Shin (1992, 1993)** modellt.
+   - A modell expliciten számol a jól értesült (insider / sharp) fogadók piaci jelenlétével ($z$ paraméter), numerikus gyökkereséssel (`scipy.optimize.brentq`) számítja ki a valódi implikált valószínűségeket, megszüntetve a favorit-underdog torzítást (longshot bias).
+
+2. **Dinamikus Elo Modell Margin of Victory (MOV) Szorzóval (`app/quant/elo.py`):**
+   - FiveThirtyEight-típusú súlyozás: a pontkülönbség és a várt esélyek függvényében skálázza az Elo-pontszám eltolódást, kizárva a tét nélküli „garbage-time” pontok torzító hatását.
+   - Hazai pálya előny (HCA: +65 Elo pont).
+
+3. **Dean Oliver Four Factors Hatékonysági Mátrix (`app/quant/elo.py`):**
+   - eFG% (Dobáshatékonyság, 40% súly)
+   - TOV% (Eladott labdák, 25% súly)
+   - ORB% (Támadólepattanó, 20% súly)
+   - FT Rate (Büntetőarány, 15% súly)
+
+4. **Játékos Proposition Monte Carlo Szimuláció (`app/quant/player_props.py`):**
+   - Játékos-pontok, lepattanók, gólpasszok (PRA) szimulálása Poisson és Negatív Binomiális eloszlással.
+   - Várható játékpercek szórásának modellezése (személyi hibák és blowout kockázat figyelembevételével).
+   - Valós idejű Fair Odds, Edge és Quarter-Kelly tétméretezés.
+
+---
+
+## 3. Tesztelési Riport
+
+Minden automatizált egység- és integrációs teszt sikeresen lefutott a virtuális környezetben:
 
 ```
-======================== 13 passed, 1 warning in 4.23s =========================
+tests/test_api.py ....                                                   [ 23%]
+tests/test_quant.py .............                                        [100%]
+======================== 17 passed, 1 warning in 20.52s ========================
 ```
 
-- **Matematikai tesztek:** American -> Decimal odds konverzió, Vig-mentesítés (kétesélyes piacok), Edge %, EV %, Fractional Kelly tétméretezés.
-- **Modell tesztek:** Monte Carlo szimuláció eloszlásai, sérülési büntetések, Brier-score kalkuláció.
-- **Integrációs tesztek:** Health, Games, Top Picks és Performance végpontok válaszstruktúrája és validációja.
-- **Frontend build:** Hiba nélküli Vite production build (`dist/assets/`).
-
 ---
 
-## 4. Jelenlegi Működési Környezet
+## 4. Futtatás és Elérhetőség
 
-- **Helyi elérhetőség:** `http://localhost:8000` (egy paranccsal futtatható a backendből: `python run.py`).
-- **Git állapot:** Kezdeti verzió előkészítve a GitHub push-ra.
-- **Adatforrás státusz:** Élő ESPN kapcsolat aktív, valós DraftKings szorzókkal.
+A teljes alkalmazás egyetlen paranccsal elindítható:
 
----
-
-## 5. Következő Mérföldkövek (Roadmap)
-
-1. **Játékos Props Modell:** Játékos-pontok, lepattanók, gólpasszok (PRA) szimulációja várható játékpercek alapján.
-2. **The Odds API másodlagos adapter:** Több európai és amerikai bukméker (Pinnacle, bet365, FanDuel) egyidejű összehasonlítása.
-3. **Automatikus eredmény-kiértékelő háttérfolyamat (Cron job):** A lezárult mérkőzések után automatikusan frissülő napló és CLV számítás.
-4. **PWA (Progressive Web App) támogatás:** Telepíthető mobilalkalmazás-ikon és offline értesítések.
+```bash
+cd backend
+./venv/bin/python run.py
+```
+A felület a **`http://localhost:8000`** címen azonnal megtekinthető.
