@@ -2,90 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Világos téma: taktikatábla. Sötét téma: krétatábla. A színek jelentése mindkettőben azonos:
+   kék = modell, narancs = piaci ár, tinta = forrásadat, szürke szaggatott = becsült alapérték. */
+:root {
+  --board: 238 241 238;
+  --paper: 250 251 249;
+  --ink: 22 26 31;
+  --mute: 82 91 100;
+  --line: 207 213 209;
+  --model: 36 87 214;
+  --market: 191 78 6;
+  --good: 23 128 61;
+  --danger: 190 30 45;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --board: 24 30 27;
+    --paper: 32 40 36;
+    --ink: 233 237 230;
+    --mute: 163 173 166;
+    --line: 56 66 61;
+    --model: 125 169 255;
+    --market: 255 160 90;
+    --good: 108 214 140;
+    --danger: 255 130 130;
+  }
+}
+
 @layer base {
-  body {
-    background-color: #040711;
-    color: #f1f5f9;
-    background-image: 
-      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(30, 58, 138, 0.25), transparent 70%),
-      radial-gradient(circle at 100% 40%, rgba(6, 182, 212, 0.08), transparent 40%),
-      radial-gradient(circle at 0% 80%, rgba(139, 92, 246, 0.06), transparent 40%);
-    background-attachment: fixed;
-  }
-  
-  h1, h2, h3, .font-display {
-    font-family: 'Outfit', sans-serif;
-  }
-  
-  code, pre, .font-mono {
-    font-family: 'JetBrains Mono', monospace;
-  }
+  html { -webkit-text-size-adjust: 100%; }
+  body { @apply bg-board font-sans text-ink antialiased; min-height: 100vh; }
+  :focus-visible { outline: 2px solid rgb(var(--model)); outline-offset: 2px; }
+  ::selection { background: rgb(var(--model) / 0.25); }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
 }
 
 @layer components {
-  /* Ultra-Premium Glassmorphism Card */
-  .glass-card {
-    background: linear-gradient(135deg, rgba(15, 26, 54, 0.75) 0%, rgba(8, 14, 30, 0.85) 100%);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+  .panel { @apply rounded-md border bg-paper; }
+  .eyebrow { @apply font-mono text-[11px] uppercase tracking-[0.12em] text-mute; }
+  .tnum { font-variant-numeric: tabular-nums; }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded border px-3.5 py-2 text-sm font-semibold transition-colors disabled:opacity-50;
   }
-  
-  .glass-card:hover {
-    border-color: rgba(56, 189, 248, 0.3);
-    box-shadow: 0 15px 35px -5px rgba(6, 182, 212, 0.15), 0 0 20px -2px rgba(59, 130, 246, 0.1);
-  }
-
-  .glass-panel {
-    background: linear-gradient(180deg, rgba(14, 23, 47, 0.85) 0%, rgba(6, 11, 25, 0.95) 100%);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-
-  .neon-pill-cyan {
-    background: rgba(6, 182, 212, 0.12);
-    border: 1px solid rgba(6, 182, 212, 0.4);
-    color: #38bdf8;
-    text-shadow: 0 0 12px rgba(6, 182, 212, 0.5);
-  }
-
-  .neon-pill-emerald {
-    background: rgba(16, 185, 129, 0.12);
-    border: 1px solid rgba(16, 185, 129, 0.4);
-    color: #34d399;
-    text-shadow: 0 0 12px rgba(16, 185, 129, 0.5);
-  }
-
-  .neon-pill-amber {
-    background: rgba(245, 158, 11, 0.12);
-    border: 1px solid rgba(245, 158, 11, 0.4);
-    color: #fbbf24;
-    text-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
-  }
-
-  .neon-pill-rose {
-    background: rgba(244, 63, 94, 0.12);
-    border: 1px solid rgba(244, 63, 94, 0.4);
-    color: #fb7185;
-    text-shadow: 0 0 12px rgba(244, 63, 94, 0.5);
+  .btn-solid { @apply border-ink bg-ink text-board hover:bg-ink/90; }
+  .btn-ghost { @apply bg-transparent text-ink hover:bg-ink/10; }
+  .tag { @apply inline-flex items-center gap-1 rounded border px-2 py-0.5 font-mono text-[11px] font-medium; }
+  /* Becsült, nem mért érték: finom szaggatott mintázat. */
+  .hatch {
+    background-image: repeating-linear-gradient(135deg, rgb(var(--mute) / 0.25) 0 1px, transparent 1px 6px);
   }
 }
 
-/* Custom slick scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #040711;
-}
-::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #3b82f6;
+@media (prefers-reduced-motion: no-preference) {
+  .fade-in { animation: fade-in 160ms ease-out; }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
 }

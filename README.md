@@ -21,17 +21,17 @@ Mobilbarát, valós idejű és statisztikailag megalapozott NBA döntéstámogat
    - **Bankroll-védelem:** 0.25x Fractional Kelly kritérium javaslat a tőke megőrzésére.
    - **Szigorú szűrés és "PASS" logika:** Ha nincs elegendő matematikai előny ($\text{Edge} < +2.0\%$ vagy magas a rotációs bizonytalanság), a rendszer jelzi: *"Nincs ajánlható tipp"*.
 
-3. **Objektív Teljesítménymérés & Backtest:**
-   - Időbélyegzett, megmásíthatatlan historikus tippnapló (zéró look-ahead bias).
-   - Találati arány (Win Rate), Kumulált Unit P/L és ROI (Yield %).
-   - **Brier-Score** (valószínűségi pontosság mérése).
-   - **Kalibrációs görbe (Reliability Diagram):** A modell által jósolt valószínűségi sávok összevetése a tényleges nyerési aránnyal.
-   - **Closing Line Value (CLV):** Záró oddsok verési aránya.
+3. **Papírkereskedési napló (teljesítménymérés):**
+   - A tippek a rögzítés pillanatában kerülnek a naplóba, **csak induló meccsre** (az indulás után a szerver elutasítja). A napló üresen indul, nincs benne mintaadat.
+   - Az eredményt az *Eredmények frissítése* gomb számolja el az ESPN végeredményéből (győztes, hendikep, total; döntetlen esetén visszajár).
+   - Mutatók: találati arány, kumulált egység és ROI, **Brier-pontszám**, **kalibráció** sávonként. Üres naplónál ezek nem jelennek meg érték nélkül, 50 lezárt tipp alatt a felület „kis minta" jelzést ad.
+   - **Nincs CLV (záró vonal) mérés:** a záró szorzó rögzítése még nincs megvalósítva, ezért a mutató nem szerepel.
+   - A napló fájl-alapú (`backend/app/data/historical_picks.json`), hitelesítés nélkül írható: nem tekinthető manipulációbiztosnak.
 
-4. **Modern Mobilbarát UI:**
-   - React + Vite + Tailwind CSS + Lucide Icons.
-   - Sötét módú, profi sport-analitikai dizájn.
-   - Részletes mérkőzés mélyelemző modal score-eloszlási hisztogrammal.
+4. **Felület ("Tábla"):**
+   - React + Vite + Tailwind CSS + Lucide Icons; világos (taktikatábla) és sötét (krétatábla) téma a rendszerbeállítás szerint.
+   - Minden szám eredete jelölt: forrásadat (ESPN), piaci ár, modell, becsült alapérték. Az ár–modell sáv egy tengelyen mutatja a piac és a modell valószínűségét.
+   - Részletes mérkőzéselemzés összpontszám-eloszlással, sérülésekkel és az összes értékelt piaccal.
 
 ---
 
