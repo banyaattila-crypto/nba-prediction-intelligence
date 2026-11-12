@@ -1,74 +1,101 @@
-# NBA Prediction & Betting Intelligence App — Állapotjelentés (Status Report)
+# NBA Prediction & Betting Intelligence — Állapotjelentés
 
-**Dátum:** 2026. november 11.  
-**Verzió:** 1.2.0 (Pro Quant & Visual Overhaul)  
-**GitHub Repozitórium:** [https://github.com/banyaattila-crypto/nba-prediction-intelligence](https://github.com/banyaattila-crypto/nba-prediction-intelligence)  
-**Státusz:** Működőképes, tesztelt produkciós prototípus (17/17 sikeres automatizált teszt)
-
----
-
-## 1. Drasztikus UI/UX és Dizájn Átdolgozás (Visual Overhaul)
-
-A felhasználói felületet teljesen átterveztük egy ultra-prémium, sötét tónusú **Cyberpunk / Quant Trading Terminal** stílusra (DexScreener, Linear és Dimers Pro ihletésű high-tech látványvilág):
-
-1. **Tipográfia & Esztétika:**
-   - **Outfit** és **Plus Jakarta Sans** modern display betűkészletek kombinálva **JetBrains Mono** numerikus kód- és odds-tipográfiával.
-   - Mélyfekete és sötétkék háttér (`bg-dark-950`), több rétegű ambient neon ragyogással (cyan `#06b6d4`, emerald `#10b981`, electric blue `#3b82f6`, crimson `#f43f5e`).
-   - Finom üveghatású rétegek (**Glassmorphism**: `backdrop-blur-2xl`, 1px áttetsző fehér szegélyek, pulzáló neon-pill címkék).
-
-2. **Átdolgozott Komponensek:**
-   - **Navbar:** Ragyogó logó-badge, élő játéknapi mikroticker (Quant Engine állapot, Monte Carlo futások száma, CET időzóna jelzés), aktív tab neonkiemelés.
-   - **GameCard (Mérkőzéskártya):** Emelt csapatlogók, valós idejű piros pulzáló ÉLŐ állásjelző, interaktív odds-panelek, és dinamikus **Kimeneteli Csata-sáv (Battle Gauge)** az esélyek azonnali vizuális összevetésére.
-   - **GameDetailModal (Aréna Showdown):** Látványos stadionfejléc, egymással szembenéző csapatlogók, **Monte Carlo Valószínűségi Sűrűségfüggvény (PDF)** hisztogram, színkódolt sérüléskártyák (Out, Questionable, Day-to-Day) és vig-mentesített terminál piacok.
-   - **PicksView (Értékkereső Terminál):** Ragyogó szűrőgombok, nagy méretű numerikus Edge % és EV % mutatók, 1-kattintásos követés (paper trade) zöld visszaigazolással.
-   - **PerformanceView (Audit & Backtest):** Nagy méretű KPI panelek neon ragyogással, megbízhatósági kalibrációs diagram és időbélyegzett historikus audit ledger.
-   - **StandingsView (Tabella):** Csapatlogók, rendezhető hatékonysági oszlopok (ORtg, DRtg, Net Rating, Pace), dinamikus színkiemeléssel.
+**Dátum:** 2026. november 12.
+**Kiadás:** 1.2.0 + az audit F1–F3 javításai (a csomagok verziószáma nem változott)
+**Repozitórium:** https://github.com/banyaattila-crypto/nba-prediction-intelligence
+**Státusz:** működő prototípus papírkereskedési (paper trading) használatra. **Valódi pénzes döntéshez nem használható**: a modell előnye nem bizonyított, és a hendikep- és total-szorzók becsültek (lásd 4. és 5. szakasz).
 
 ---
 
-## 2. Kvantitatív Matematikai Továbbfejlesztések (`quant/`)
+## 1. Összefoglaló
 
-A matematikai motort négy új professzionális kvantitatív modullal bővítettük:
+Az alkalmazás az ESPN publikus adataiból összeveti a modell és a piac valószínűségeit, és a különbséget (eltérés, százalékpont) mutatja meg. Az eltérés nem bizonyított előny. Ezt kizárólag a Napló fül lezárt tippjei mérik. A napló üresen indul, értelmezhető értékeléshez legalább 50 lezárt tipp kell.
 
-1. **Shin Devigging Algoritmus (`app/quant/shin.py`):**
-   - A standard multiplikatív eljáráson túl bevezettük a tudományos sportfogadási etalonnak számító **Shin (1992, 1993)** modellt.
-   - A modell expliciten számol a jól értesült (insider / sharp) fogadók piaci jelenlétével ($z$ paraméter), numerikus gyökkereséssel (`scipy.optimize.brentq`) számítja ki a valódi implikált valószínűségeket, megszüntetve a favorit-underdog torzítást (longshot bias).
-
-2. **Dinamikus Elo Modell Margin of Victory (MOV) Szorzóval (`app/quant/elo.py`):**
-   - FiveThirtyEight-típusú súlyozás: a pontkülönbség és a várt esélyek függvényében skálázza az Elo-pontszám eltolódást, kizárva a tét nélküli „garbage-time” pontok torzító hatását.
-   - Hazai pálya előny (HCA: +65 Elo pont).
-
-3. **Dean Oliver Four Factors Hatékonysági Mátrix (`app/quant/elo.py`):**
-   - eFG% (Dobáshatékonyság, 40% súly)
-   - TOV% (Eladott labdák, 25% súly)
-   - ORB% (Támadólepattanó, 20% súly)
-   - FT Rate (Büntetőarány, 15% súly)
-
-4. **Játékos Proposition Monte Carlo Szimuláció (`app/quant/player_props.py`):**
-   - Játékos-pontok, lepattanók, gólpasszok (PRA) szimulálása Poisson és Negatív Binomiális eloszlással.
-   - Várható játékpercek szórásának modellezése (személyi hibák és blowout kockázat figyelembevételével).
-   - Valós idejű Fair Odds, Edge és Quarter-Kelly tétméretezés.
+Egy független szoftveraudit (2026-11-12) 13 leletet talált. Ebből az F1, F2 és F3 javítva van, a többi nyitott (5. szakasz).
 
 ---
 
-## 3. Tesztelési Riport
+## 2. Az audit alapján elvégzett javítások
 
-Minden automatizált egység- és integrációs teszt sikeresen lefutott a virtuális környezetben:
+| Lelet | Súlyosság | Javítás |
+|---|---|---|
+| **F1** path traversal | Kritikus | A SPA-kiszolgáló a kért útvonalat `realpath`-szal oldja fel, és csak a `frontend/dist` mappán belüli fájlt adja ki. A `/../../backend/run.py` típusú kérések már az `index.html`-t kapják. |
+| **F2** a napló felülírása | Kritikus | Sérült vagy olvashatatlan naplófájlnál a szerver 503-at ad, és nem írja felül a fájlt (korábban 12 sorból 1 lett). Az írás atomi (ideiglenes fájl, `fsync`, `os.replace`), a módosítás zár alatt fut. |
+| **F3** kitalált adat és hamis feliratok | Kritikus | A kitalált mintatippek törölve, a napló üresen indul. Üres naplónál nincs alapértelmezett Brier/CLV érték. A placeholder CLV megszűnt, a CLV nincs mérve. A „zéró look-ahead bias" és a „jó kalibráció" feliratok megszűntek, a felület szövegei az adatból épülnek. |
+
+**Kapcsolódó változások az F3-hoz**
+- **Elszámolás:** `POST /api/history/settle` az ESPN végeredményéből lezárja a függő tippeket (győztes, hendikep, total; döntetlen esetén visszajár).
+- **Look-ahead védelem:** az `/api/picks` és `/api/picks/top` csak induló meccset értékel. Az `/api/picks/track` az indulás után 409-et, értelmezhetetlen dátumra 422-t ad.
+- **Kalibráció és Brier:** a döntetlenre végződő (PUSH) tipp nem számít bele, mert nincs bináris kimenete.
+
+---
+
+## 3. Felület („Tábla")
+
+A felületet teljesen újraterveztem. Az előző cyberpunk/glassmorphism megjelenést felváltotta egy taktikatábla-világ.
+
+- **Téma:** világos (taktikatábla) és sötét (krétatábla) a rendszerbeállítás szerint.
+- **Eredetjelölők:** kék ◆ a modell, narancs ■ a piaci ár, fekete ● a forrásadat, szürke szaggatott ○ a becsült alapérték. Az **ár–modell sáv** egy tengelyen mutatja a piac és a modell valószínűségét.
+- **Fülek:** Mérkőzések, Eltérések, Napló, Tabella. Ezen kívül Módszertan ablak az ismert korlátok listájával.
+- **Működés:** hiba- és üres állapotok újrapróbálással; a „Rögzítve" jelzés csak szerveroldali siker után jelenik meg; az elemzés minden szimulált összpontszám-sávot mutat; a meccslista nem vár a lassú modellre.
+- **Elérhetőség:** párbeszédablakban Esc és fókuszcsapda, `aria-*` jelölések, vissza nem térő mozgás csökkentése (`prefers-reduced-motion`).
+- **Technika:** React 18, Vite 6, Tailwind 3 (színek CSS-változókból), JSX (nincs TypeScript).
+
+---
+
+## 4. A kvantmodulok tényleges állapota
+
+| Modul | Állapot |
+|---|---|
+| `ev_calculator.py` (vig-mentesítés, edge, EV, Kelly) | Bekötve, a képletek tesztelve |
+| `monte_carlo.py` (10 000 szimuláció) | Bekötve; a szórás (σ = 11,5) fix, valós eredményeken nincs hitelesítve (audit F7) |
+| `ratings.py` (csapat- és sérüléshatás) | Bekötve; a B2B/pihenőnap nincs számolva, a sztárlista statikus |
+| `shin.py` | **Hibás és nincs bekötve:** a gyökkeresés nem konvergál, az eredmény mindig megegyezik a multiplikatív vig-mentesítéssel (F6) |
+| `elo.py` (Elo, MOV, Four Factors) | Nincs bekötve, csak a tesztek használják (F6) |
+| `player_props.py` | Nincs bekötve, csak a tesztek használják (F6) |
+
+A korábbi jelentések állításai a Shin-modellről, az Elo-ról és a játékos-propokról tehát nem a működő alkalmazásra vonatkoztak.
+
+---
+
+## 5. Nyitott leletek (prioritási sorrendben)
+
+| ID | Súlyosság | Tartalom |
+|---|---|---|
+| F4 | Magas | A hendikep- és total-szorzó mindig 1,91 (az ESPN nem ad árat); hiányzó vonalnál kitalált alapértékek. A felület ezt jelöli, de az EV tájékoztató jellegű marad. |
+| F5 | Magas | ESPN-hiba vagy üres lista esetén kitalált fallback-meccsek jelennek meg valósként. |
+| F6 | Magas | Shin hibás, az Elo, a Four Factors és a player props nincs bekötve; a `/health` „Power Devigging"-et állít, ilyen nincs. |
+| F7 | Magas | A modell szórása nincs hitelesítve; a mért különbségszórás (16,2) a szokásos NBA-értéknél (~12–13) feltehetően nagyobb `[FELTÉTELEZÉS]`. |
+| F8 | Közepes | Hitelesítés nélküli írás (`/api/picks/track`, `/api/history/settle`); a tipp adatait a kliens küldi; `units` nincs validálva; CORS `*`; a szerver `0.0.0.0`-n indul. |
+| F9 | Közepes | A gyorsítótárazott `Game` objektumot a részletes lekérés módosítja; szekvenciális ESPN-hívások. |
+| F10 | Közepes | Nincs `requirements.txt`/`pyproject.toml`, nincs CI. |
+| F11 | Közepes | Nincs frontend-teszt, nincs lint. |
+| F12 | Alacsony | Verziószám-eltérés (`main.py` 1.0.0, `package.json` 1.0.0); az ismeretlen `/api/*` útvonal 200-zal `index.html`-t ad. |
+| — | Nincs megvalósítva | A záró vonal (CLV) rögzítése. |
+
+---
+
+## 6. Tesztek
 
 ```
-tests/test_api.py ....                                                   [ 23%]
-tests/test_quant.py .............                                        [100%]
-======================== 17 passed, 1 warning in 20.52s ========================
+backend/tests: 46 passed
+  test_api.py      4  (végpontok)
+  test_quant.py   13  (képletek, szimuláció, Shin/Elo/props önállóan)
+  test_tracker.py 29  (napló, elszámolás, look-ahead védelem, csak induló meccsek)
 ```
+
+A `test_api.py` az élő ESPN-hívás hibája esetén a fallback-ágon is zöld, tehát nem bizonyítja az élő működést. A frontendnek nincs automatikus tesztje; a felületet böngészőben, élő és kitalált (jövőbeli) adaton kézzel ellenőriztem.
 
 ---
 
-## 4. Futtatás és Elérhetőség
-
-A teljes alkalmazás egyetlen paranccsal elindítható:
+## 7. Futtatás
 
 ```bash
-cd backend
-./venv/bin/python run.py
+cd frontend && npm install && npm run build   # a backend a frontend/dist mappát szolgálja ki
+cd ../backend
+./venv/bin/python run.py                      # http://localhost:8000
 ```
-A felület a **`http://localhost:8000`** címen azonnal megtekinthető.
+
+Fejlesztői módban: `cd frontend && npm run dev` (http://localhost:3000, `/api` proxy a 8000-es portra).
+
+Papírkereskedés: az **Eltérések** fülön a „Rögzítés papírkereskedésként" gombbal vehető fel tipp (csak induló meccsre), a meccs után a **Napló** fül „Eredmények frissítése" gombja számolja el.
