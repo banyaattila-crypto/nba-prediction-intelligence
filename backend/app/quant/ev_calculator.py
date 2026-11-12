@@ -1,5 +1,10 @@
 import math
-from typing import Tuple, List, Dict, Any
+from typing import Optional, Tuple, List, Dict, Any
+
+from scipy.optimize import brentq
+
+from app.quant import calibration
+from app.quant.shin import shin_devig_two_way
 
 def american_to_decimal(american: float) -> float:
     """Convert American odds (+150, -110) to decimal odds (2.50, 1.91)."""
@@ -16,22 +21,40 @@ def decimal_to_implied_prob(decimal_odds: float) -> float:
         return 0.99
     return round(1.0 / decimal_odds, 4)
 
-def remove_vig_two_way(odds_a: float, odds_b: float) -> Tuple[float, float, float]:
+def _power_devig(odds_a: float, odds_b: float) -> Tuple[float, float]:
+    """Hatványos módszer: p_i = q_i^k, ahol k >= 1 úgy, hogy sum(p_i) = 1 (q_i = 1 / szorzó_i)."""
+    q_a, q_b = 1.0 / odds_a, 1.0 / odds_b
+    if q_a + q_b <= 1.0:  # nincs árrés: nincs mit levonni
+        total = q_a + q_b
+        return q_a / total, q_b / total
+    k = brentq(lambda x: q_a ** x + q_b ** x - 1.0, 1.0, 50.0, xtol=1e-12, maxiter=200)
+    return q_a ** k, q_b ** k
+
+
+def remove_vig_two_way(odds_a: float, odds_b: float, method: Optional[str] = None) -> Tuple[float, float, float]:
     """
     Remove bookmaker margin (vig) from a 2-way market.
+    method: "power" | "shin" | "multiplicative"; None = calibration.DEVIG_METHOD (a mért legjobb).
     Returns: (fair_prob_a, fair_prob_b, vig_percentage)
     """
     if odds_a <= 1.0 or odds_b <= 1.0:
         return (0.5, 0.5, 0.0)
-    
+
     raw_p_a = 1.0 / odds_a
     raw_p_b = 1.0 / odds_b
     total_implied = raw_p_a + raw_p_b
     vig = (total_implied - 1.0) * 100.0
-    
-    fair_p_a = raw_p_a / total_implied
-    fair_p_b = raw_p_b / total_implied
-    
+
+    method = method or calibration.DEVIG_METHOD
+    if method == "power":
+        fair_p_a, fair_p_b = _power_devig(odds_a, odds_b)
+    elif method == "shin":
+        fair_p_a, fair_p_b, _, _ = shin_devig_two_way(odds_a, odds_b)
+    elif method == "multiplicative":
+        fair_p_a, fair_p_b = raw_p_a / total_implied, raw_p_b / total_implied
+    else:
+        raise ValueError(f"Ismeretlen vig-mentesítési módszer: {method}")
+
     return round(fair_p_a, 4), round(fair_p_b, 4), round(vig, 2)
 
 def calculate_edge(model_prob: float, fair_prob: float) -> float:

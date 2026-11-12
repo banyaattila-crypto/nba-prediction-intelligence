@@ -13,6 +13,12 @@ pozitívnak mutatja.
 """
 from typing import Optional
 
+# Vig-mentesítés módszere ("multiplicative" | "power" | "shin"). A 170 meccs moneyline-ján (calibration/analyze.py D. rész) a
+# hazai győzelem valószínűségének log-lossa: arányos 0,5413, Shin 0,5373, hatványos 0,5351; a páros különbségek bootstrap
+# szerint kimutathatók (hatványos vs arányos -0,0062 [-0,0090; -0,0033], hatványos vs Shin -0,0022 [-0,0032; -0,0012]).
+# Közel egyenlő esélyű piacon (pl. -110/-110) a módszerek közel azonos eredményt adnak.
+DEVIG_METHOD = "power"
+
 MARGIN_SD = 14.4   # a tényleges különbség szórása a záró vonal körül
 TOTAL_SD = 17.7    # a tényleges összpontszám szórása a záró vonal körül
 

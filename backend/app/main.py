@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.providers.espn import ESPNProvider
 from app.services.prediction_service import PredictionService
 from app.errors import DataSourceError, InsufficientDataError
+from app.quant import calibration
 from app.security import allowed_origins, require_write_access
 from app.services.settlement import parse_pick_id
 from app.services.tracker_service import TrackerService, TrackerStorageError
@@ -53,7 +54,7 @@ async def health_check():
         "status": "online",
         "provider": "ESPN Public Data Adapter",
         "quant_engine": "Vectorized Monte Carlo (10,000 iterations)",
-        "vig_model": "Multiplicative & Power Devigging",
+        "vig_model": f"{calibration.DEVIG_METHOD} devigging",
         "timestamp": os.getenv("UPTIME_START", "active")
     }
 

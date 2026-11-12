@@ -19,6 +19,7 @@ const LIMITS = [
   'Az ORtg, DRtg és tempó a pontátlagokból becsült érték.',
   'A modell nem ad hozzá információt a piachoz (170 meccses visszamérés, 2026-10-20 – 11-12, kalibrációs súly: 0), ezért a jelzések a piaci valószínűséghez igazodnak. Kis minta: a CI széles, kis pozitív súly nem zárható ki.',
   'A történelmi sérülések és pihenőnapok nem álltak rendelkezésre, ezért a sérülés- és pihenőhatás nem mérhető vissza.',
+  'A vig-mentesítés módszerét csak a moneyline-on mértük (170 meccs, a szezon eleje); hendikepen és totalon az árak közel egyenlők, ott a módszerek alig térnek el.',
   'A záró vonal (CLV) rögzítése nincs megvalósítva.',
 ]
 
@@ -38,8 +39,13 @@ export default function MethodologyModal({ onClose }) {
         </Block>
 
         <Block title="1. A piaci ár vig-mentesítése">
-          <p className="text-sm text-mute">A szorzókból számolt valószínűségek összege 100% fölött van, a többlet a bukméker árrése. Kétkimenetes piacon arányosan osztjuk szét:</p>
-          <Formula>{'P_piac(A) = (1 / szorzó_A) / (1 / szorzó_A + 1 / szorzó_B)'}</Formula>
+          <p className="text-sm text-mute">
+            A szorzókból számolt valószínűségek összege 100% fölött van, a többlet a bukméker árrése. Kétkimenetes piacon hatványos módszerrel vesszük le: olyan k ≥ 1 kitevővel, hogy a két valószínűség összege pontosan 1 lesz.
+          </p>
+          <Formula>{'P_piac(A) = (1 / szorzó_A)^k      ahol (1 / szorzó_A)^k + (1 / szorzó_B)^k = 1'}</Formula>
+          <p className="text-sm text-mute">
+            A favoritnak így nagyobb, az esélytelenebbnek kisebb valószínűség jut, mint az arányos osztásnál. A 170 lejátszott meccs moneyline-ján a hatványos módszer becsülte legjobban a tényleges kimenetelt (log-loss 0,5351, szemben a Shin-féle 0,5373 és az arányos 0,5413 értékkel), a különbségek páros bootstrap szerint kimutathatók. Közel egyenlő esélyű piacon (például −110/−110) a módszerek ugyanazt adják.
+          </p>
         </Block>
 
         <Block title="2. Eltérés és várható hozam">

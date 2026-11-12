@@ -13,7 +13,7 @@ Mobilbarát, valós idejű és statisztikailag megalapozott NBA döntéstámogat
    - Hivatalos sérülésjelentések (Out, Questionable, Day-to-Day) és egymást követő meccsnapok (Back-to-Back fáradtság).
 
 2. **Kvantitatív Elemző Motor (Quant Engine):**
-   - **Vig-mentesítés (Devigging):** Multiplikatív piaci árrés-eltávolítás a tiszta fair valószínűségek kinyeréséhez ($P_{\text{fair}}$).
+   - **Vig-mentesítés (Devigging):** hatványos módszer a tiszta fair valószínűségek kinyeréséhez ($p_i = q_i^k$, ahol $\sum p_i = 1$). A módszert a szezon 170 meccsének moneyline-ján mért log-loss alapján választottuk (hatványos 0,5351, Shin 0,5373, arányos 0,5413); lásd `backend/calibration/analyze.py`.
    - **Monte Carlo Szimuláció:** Meccsenként 10 000 független vektorizált szimuláció (NumPy) normál ponteloszlással és tempókorrelációval.
    - **Él (Edge) és Várható Érték (EV):**
      $$\text{Edge} = P_{\text{modell}} - P_{\text{fair}}$$

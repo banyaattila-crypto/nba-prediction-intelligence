@@ -91,13 +91,13 @@ def test_brier_score():
     assert brier == 0.04
 
 from app.quant.shin import shin_devig_two_way
-from app.quant.elo import (
+from app.quant.experimental.elo import (
     calculate_elo_win_prob,
     calculate_mov_multiplier,
     update_elo,
     calculate_four_factors_rating
 )
-from app.quant.player_props import simulate_player_prop
+from app.quant.experimental.player_props import simulate_player_prop
 
 def test_shin_devig():
     # Symmetric odds

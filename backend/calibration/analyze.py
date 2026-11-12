@@ -7,6 +7,7 @@ Mit mér:
   B. a jelenlegi modellt PONTBELI csapatértékeléssel (egy meccsnél csak az előtte lejátszott meccsek számítanak,
      nincs look-ahead): mennyire pontos a piachoz képest, és mekkora súllyal érdemes a piaci vonalhoz keverni
   C. a csapatértékelés zsugorítását a ligaátlag felé (szezon eleji zajos pontátlagok ellen)
+  D. a vig-mentesítési módszereket (arányos, Shin, hatványos): melyik becsüli jobban a tényleges kimenetelt
 A bizonytalanságot bootstrap adja (2000 újramintavétel, rögzített mag).
 """
 import json
@@ -15,12 +16,14 @@ from collections import defaultdict
 from pathlib import Path
 
 import numpy as np
+from scipy.optimize import brentq
 from scipy.stats import norm
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.models.schemas import Team  # noqa: E402
 from app.providers.espn import estimate_ratings  # noqa: E402
 from app.quant.ratings import calculate_matchup_ratings  # noqa: E402
+from app.quant.shin import shin_devig_two_way  # noqa: E402
 
 DATA = Path(__file__).with_name("season_games.json")
 MIN_PRIOR_GAMES = 5          # ennyi előzetes meccs kell mindkét csapatnál a modell értékeléséhez
@@ -88,6 +91,44 @@ def rmse(x):
     return float(np.sqrt(np.mean(np.square(x))))
 
 
+def devig_comparison(games):
+    """D. Moneyline: a hazai győzelem vig-mentes valószínűsége vs. a tényleges kimenetel, módszerenként."""
+    def multiplicative(a, b):
+        return (1 / a) / (1 / a + 1 / b)
+
+    def shin(a, b):
+        return shin_devig_two_way(a, b)[0]
+
+    def power(a, b):  # p_i = q_i^k, sum = 1
+        q = np.array([1 / a, 1 / b])
+        k = brentq(lambda x: float((q ** x).sum() - 1.0), 1.0, 30.0)
+        return float(q[0] ** k)
+
+    rows = [(g["odds"]["moneyline_home"], g["odds"]["moneyline_away"], 1.0 if g["home_score"] > g["away_score"] else 0.0)
+            for g in games if g["odds"].get("moneyline_home") and g["odds"].get("moneyline_away")]
+    y = np.array([r[2] for r in rows])
+    methods = {"arányos": multiplicative, "Shin": shin, "hatványos": power}
+    probs = {name: np.array([f(a, b) for a, b, _ in rows]) for name, f in methods.items()}
+    log_loss = lambda p: -(y * np.log(p) + (1 - y) * np.log(1 - p))
+    brier = lambda p: (p - y) ** 2
+    lopsided = np.array([max(multiplicative(a, b), 1 - multiplicative(a, b)) > 0.70 for a, b, _ in rows])
+
+    print("\nD. VIG-MENTESÍTÉSI MÓDSZEREK (moneyline, hazai győzelem)")
+    print(f"   n={len(rows)}, ebből lopsided (favorit > 70%): {int(lopsided.sum())}")
+    print(f"   {'módszer':<10} {'log-loss':>9} {'Brier':>8} | {'Δ log-loss az arányoshoz':>26} {'95% CI':>20} | {'Δ csak lopsided':>16}")
+    base = log_loss(probs["arányos"])
+    for name, p in probs.items():
+        d = log_loss(p) - base
+        boots = [RNG.choice(d, size=len(d), replace=True).mean() for _ in range(2000)]
+        lo, hi = np.percentile(boots, [2.5, 97.5])
+        print(f"   {name:<10} {log_loss(p).mean():>9.4f} {brier(p).mean():>8.4f} | {d.mean():>+26.5f} [{lo:+.4f},{hi:+.4f}] | {d[lopsided].mean():>+16.5f}")
+    print("   (negatív Δ = jobb az arányosnál; ha a CI tartalmazza a nullát, a különbség nem kimutatható)")
+    d = log_loss(probs["hatványos"]) - log_loss(probs["Shin"])
+    boots = [RNG.choice(d, size=len(d), replace=True).mean() for _ in range(2000)]
+    lo, hi = np.percentile(boots, [2.5, 97.5])
+    print(f"   hatványos vs Shin (páros): Δ log-loss {d.mean():+.5f} [{lo:+.4f},{hi:+.4f}]  ({'a hatványos jobb' if hi < 0 else 'a Shin jobb' if lo > 0 else 'nem kimutatható különbség'})")
+
+
 def main():
     games = load()
     print(f"Adat: {len(games)} meccs, {games[0]['date'][:10]} .. {games[-1]['date'][:10]}")
@@ -127,6 +168,7 @@ def main():
         if best is None or rmse(a_m - md_m) < best[0]:
             best = (rmse(a_m - md_m), k, w_m, w_t, ci_m, ci_t)
     print(f"\n   legjobb zsugorítás (a modell különbség-RMSE-je szerint): k={best[1]}")
+    devig_comparison(games)
     print(f"\nJAVASOLT PARAMÉTEREK: MARGIN_SD={sd_m:.1f}  TOTAL_SD={sd_t:.1f}  RATING_SHRINK_GAMES={best[1]}  "
           f"MARGIN_MODEL_WEIGHT={max(0.0, best[2]):.2f}  TOTAL_MODEL_WEIGHT={max(0.0, best[3]):.2f}")
 
