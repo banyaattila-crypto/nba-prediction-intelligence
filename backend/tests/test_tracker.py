@@ -147,7 +147,8 @@ class StubProvider:
 
 
 def test_picks_only_for_scheduled_games(monkeypatch):
-    odds = OddsItem(provider="t", spread=-3.5, over_under=225.5, moneyline_home=1.8, moneyline_away=2.1)
+    odds = OddsItem(provider="t", spread=-3.5, spread_home_odds=1.91, spread_away_odds=1.91, over_under=225.5, over_odds=1.91, under_odds=1.91,
+                    moneyline_home=1.8, moneyline_away=2.1)
     done, upcoming, live = final_game("100", 110, 100), final_game("200", None, None), final_game("300", 50, 40)
     done.odds = upcoming.odds = live.odds = odds
     upcoming.status, live.status = "scheduled", "in_progress"

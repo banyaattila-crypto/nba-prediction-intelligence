@@ -26,8 +26,8 @@ class PredictionService:
             away_is_b2b=game.away_is_b2b
         )
 
-        spread_line = game.odds.spread if game.odds else -3.5
-        total_line = game.odds.over_under if game.odds else 224.5
+        spread_line = game.odds.spread if game.odds else None
+        total_line = game.odds.over_under if game.odds else None
 
         # Run 10,000 iterations Monte Carlo simulation
         sim_result = run_monte_carlo_simulation(
@@ -74,7 +74,7 @@ class PredictionService:
             return picks
 
         matchup_str = f"{game.away_team.abbreviation} @ {game.home_team.abbreviation}"
-        bookmaker = odds.provider or "DraftKings"
+        bookmaker = odds.provider
         now_str = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         uncertainty = matchup_data["uncertainty"]
 
@@ -151,15 +151,15 @@ class PredictionService:
             ))
 
         # ---------------- 2. SPREAD (HENDIKEP) MARKET ----------------
-        if odds.spread is not None:
+        if odds.spread is not None and odds.spread_home_odds and odds.spread_away_odds:
             spread_line = odds.spread
             cover_prob_h = sim.spread_cover_probs.get(str(spread_line), 0.50)
             cover_prob_a = round(1.0 - cover_prob_h, 4)
             
-            fair_sp_h, fair_sp_a, vig_sp = remove_vig_two_way(odds.spread_home_odds or 1.91, odds.spread_away_odds or 1.91)
+            fair_sp_h, fair_sp_a, vig_sp = remove_vig_two_way(odds.spread_home_odds, odds.spread_away_odds)
             
             edge_sp_h = calculate_edge(cover_prob_h, fair_sp_h)
-            ev_sp_h = calculate_ev(cover_prob_h, odds.spread_home_odds or 1.91)
+            ev_sp_h = calculate_ev(cover_prob_h, odds.spread_home_odds)
             verdict_sp_h, conf_sp_h = evaluate_verdict(edge_sp_h, ev_sp_h, uncertainty)
 
             sign_h = f"+{spread_line}" if spread_line > 0 else f"{spread_line}"
@@ -173,14 +173,14 @@ class PredictionService:
                 market="SPREAD",
                 selection=f"{game.home_team.abbreviation} {sign_h}",
                 line=spread_line,
-                bookmaker_odds=odds.spread_home_odds or 1.91,
+                bookmaker_odds=odds.spread_home_odds,
                 bookmaker=bookmaker,
-                implied_prob=decimal_to_implied_prob(odds.spread_home_odds or 1.91),
+                implied_prob=decimal_to_implied_prob(odds.spread_home_odds),
                 fair_implied_prob=fair_sp_h,
                 model_prob=cover_prob_h,
                 edge=edge_sp_h,
                 ev=ev_sp_h,
-                kelly_stake=calculate_kelly_stake(cover_prob_h, odds.spread_home_odds or 1.91) if verdict_sp_h != "PASS" else 0.0,
+                kelly_stake=calculate_kelly_stake(cover_prob_h, odds.spread_home_odds) if verdict_sp_h != "PASS" else 0.0,
                 confidence=conf_sp_h,
                 uncertainty=uncertainty,
                 verdict=verdict_sp_h,
@@ -193,7 +193,7 @@ class PredictionService:
             ))
 
             edge_sp_a = calculate_edge(cover_prob_a, fair_sp_a)
-            ev_sp_a = calculate_ev(cover_prob_a, odds.spread_away_odds or 1.91)
+            ev_sp_a = calculate_ev(cover_prob_a, odds.spread_away_odds)
             verdict_sp_a, conf_sp_a = evaluate_verdict(edge_sp_a, ev_sp_a, uncertainty)
 
             picks.append(PickRecommendation(
@@ -204,14 +204,14 @@ class PredictionService:
                 market="SPREAD",
                 selection=f"{game.away_team.abbreviation} {sign_a}",
                 line=-spread_line,
-                bookmaker_odds=odds.spread_away_odds or 1.91,
+                bookmaker_odds=odds.spread_away_odds,
                 bookmaker=bookmaker,
-                implied_prob=decimal_to_implied_prob(odds.spread_away_odds or 1.91),
+                implied_prob=decimal_to_implied_prob(odds.spread_away_odds),
                 fair_implied_prob=fair_sp_a,
                 model_prob=cover_prob_a,
                 edge=edge_sp_a,
                 ev=ev_sp_a,
-                kelly_stake=calculate_kelly_stake(cover_prob_a, odds.spread_away_odds or 1.91) if verdict_sp_a != "PASS" else 0.0,
+                kelly_stake=calculate_kelly_stake(cover_prob_a, odds.spread_away_odds) if verdict_sp_a != "PASS" else 0.0,
                 confidence=conf_sp_a,
                 uncertainty=uncertainty,
                 verdict=verdict_sp_a,
@@ -224,7 +224,7 @@ class PredictionService:
             ))
 
         # ---------------- 3. TOTALS (OVER / UNDER) MARKET ----------------
-        if odds.over_under is not None:
+        if odds.over_under is not None and odds.over_odds and odds.under_odds:
             tot_line = odds.over_under
             # Probability from Monte Carlo
             # Normal distribution approximation on sim totals
@@ -237,11 +237,11 @@ class PredictionService:
             p_under = round(float(stats.norm.cdf(tot_line, loc=sim_tot_mean, scale=sim_tot_std)), 4)
             p_over = round(1.0 - p_under, 4)
             
-            fair_over, fair_under, vig_tot = remove_vig_two_way(odds.over_odds or 1.91, odds.under_odds or 1.91)
+            fair_over, fair_under, vig_tot = remove_vig_two_way(odds.over_odds, odds.under_odds)
 
             # Over
             edge_over = calculate_edge(p_over, fair_over)
-            ev_over = calculate_ev(p_over, odds.over_odds or 1.91)
+            ev_over = calculate_ev(p_over, odds.over_odds)
             verdict_ov, conf_ov = evaluate_verdict(edge_over, ev_over, uncertainty)
 
             picks.append(PickRecommendation(
@@ -252,14 +252,14 @@ class PredictionService:
                 market="TOTAL_OVER",
                 selection=f"Over {tot_line}",
                 line=tot_line,
-                bookmaker_odds=odds.over_odds or 1.91,
+                bookmaker_odds=odds.over_odds,
                 bookmaker=bookmaker,
-                implied_prob=decimal_to_implied_prob(odds.over_odds or 1.91),
+                implied_prob=decimal_to_implied_prob(odds.over_odds),
                 fair_implied_prob=fair_over,
                 model_prob=p_over,
                 edge=edge_over,
                 ev=ev_over,
-                kelly_stake=calculate_kelly_stake(p_over, odds.over_odds or 1.91) if verdict_ov != "PASS" else 0.0,
+                kelly_stake=calculate_kelly_stake(p_over, odds.over_odds) if verdict_ov != "PASS" else 0.0,
                 confidence=conf_ov,
                 uncertainty=uncertainty,
                 verdict=verdict_ov,
@@ -273,7 +273,7 @@ class PredictionService:
 
             # Under
             edge_under = calculate_edge(p_under, fair_under)
-            ev_under = calculate_ev(p_under, odds.under_odds or 1.91)
+            ev_under = calculate_ev(p_under, odds.under_odds)
             verdict_un, conf_un = evaluate_verdict(edge_under, ev_under, uncertainty)
 
             picks.append(PickRecommendation(
@@ -284,14 +284,14 @@ class PredictionService:
                 market="TOTAL_UNDER",
                 selection=f"Under {tot_line}",
                 line=tot_line,
-                bookmaker_odds=odds.under_odds or 1.91,
+                bookmaker_odds=odds.under_odds,
                 bookmaker=bookmaker,
-                implied_prob=decimal_to_implied_prob(odds.under_odds or 1.91),
+                implied_prob=decimal_to_implied_prob(odds.under_odds),
                 fair_implied_prob=fair_under,
                 model_prob=p_under,
                 edge=edge_under,
                 ev=ev_under,
-                kelly_stake=calculate_kelly_stake(p_under, odds.under_odds or 1.91) if verdict_un != "PASS" else 0.0,
+                kelly_stake=calculate_kelly_stake(p_under, odds.under_odds) if verdict_un != "PASS" else 0.0,
                 confidence=conf_un,
                 uncertainty=uncertainty,
                 verdict=verdict_un,

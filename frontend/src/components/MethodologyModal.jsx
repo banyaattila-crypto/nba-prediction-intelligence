@@ -13,7 +13,7 @@ function Block({ title, children }) {
 const Formula = ({ children }) => <pre className="tnum overflow-x-auto rounded border bg-paper p-3 font-mono text-xs leading-relaxed">{children}</pre>
 
 const LIMITS = [
-  'A hendikep- és total-szorzó becsült (1,91): az ESPN ezekhez nem ad árat. Csak a moneyline ár valós.',
+  'Egyetlen könyv árai alapján számol: az ESPN által közölt aktuális DraftKings-vonalak és szorzók. Ha egy ár vagy vonal hiányzik (például „OFF"), az adott piac nem kerül értékelésre.',
   'A pihenőnap és a hátizsák-meccs (back-to-back) hatása jelenleg nincs számolva, a rendszer mindig alapértéket használ.',
   'A sérülések hatása fix sztárlistából és általános alapértékből jön, nem aktuális játékosadatból.',
   'Az ORtg, DRtg és tempó a pontátlagokból becsült érték.',

@@ -37,8 +37,4 @@ export const VERDICT_LABEL = {
   PASS: 'Nincs eltérés',
 }
 
-// Az ESPN a hendikep- és total-piachoz nem ad szorzót, a backend 1,91-et állít be (audit F4).
-// Amíg ez így van, ezeket a szorzókat becsültként jelöljük.
-export const ESTIMATED_PRICE_MARKETS = new Set(['SPREAD', 'TOTAL_OVER', 'TOTAL_UNDER'])
-
 export const isFlagged = (pick) => pick.verdict !== 'PASS'

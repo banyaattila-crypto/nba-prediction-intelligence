@@ -9,6 +9,72 @@ ESPN_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/
 ESPN_SUMMARY_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
 ESPN_STANDINGS_URL = "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
 
+
+def parse_american_odds(value: Any) -> Optional[float]:
+    """Amerikai szorzó ("-437", "+341", -440, "EVEN") tizedes szorzóvá. Hiányzó vagy nem fogadható ("OFF") érték: None."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        n = float(value)
+    else:
+        text = str(value).strip().upper()
+        if text in ("EVEN", "EV"):
+            n = 100.0
+        else:
+            try:
+                n = float(text.replace("+", ""))
+            except ValueError:
+                return None
+    if -100 < n < 100:  # nem érvényes amerikai ár (0 is)
+        return None
+    return american_to_decimal(n)
+
+
+def parse_line(value: Any) -> Optional[float]:
+    """Vonal ("-10.5", "+10.5", "o221.5", "u221.5", 221.5) számmá; hiányzó érték: None."""
+    if value is None or isinstance(value, bool):
+        return None
+    text = str(value).strip().lower()
+    if text[:1] in ("o", "u"):
+        text = text[1:]
+    try:
+        return float(text.replace("+", ""))
+    except ValueError:
+        return None
+
+
+def parse_odds(entry: Dict[str, Any]) -> Optional[OddsItem]:
+    """Az ESPN odds-blokkjából (scoreboard `odds[0]` vagy summary `pickcenter[0]`) árak és vonalak.
+
+    Csak azt adja vissza, amit az ESPN tényleg közöl: ami hiányzik vagy nem fogadható (pl. "OFF"), az None.
+    A hendikep vonala a hazai csapat szemszögéből értendő.
+    """
+    if not entry:
+        return None
+    ml, ps, tt = entry.get("moneyline") or {}, entry.get("pointSpread") or {}, entry.get("total") or {}
+    home_t, away_t = entry.get("homeTeamOdds") or {}, entry.get("awayTeamOdds") or {}
+
+    def close(block: Dict[str, Any], side: str, key: str) -> Any:
+        return ((block.get(side) or {}).get("close") or {}).get(key)
+
+    def first(*values: Optional[float]) -> Optional[float]:
+        return next((v for v in values if v is not None), None)
+
+    odds = OddsItem(
+        provider=(entry.get("provider") or {}).get("name") or "Ismeretlen",
+        spread=first(parse_line(close(ps, "home", "line")), parse_line(entry.get("spread"))),
+        spread_home_odds=first(parse_american_odds(close(ps, "home", "odds")), parse_american_odds(home_t.get("spreadOdds"))),
+        spread_away_odds=first(parse_american_odds(close(ps, "away", "odds")), parse_american_odds(away_t.get("spreadOdds"))),
+        over_under=first(parse_line(close(tt, "over", "line")), parse_line(entry.get("overUnder"))),
+        over_odds=first(parse_american_odds(close(tt, "over", "odds")), parse_american_odds(entry.get("overOdds"))),
+        under_odds=first(parse_american_odds(close(tt, "under", "odds")), parse_american_odds(entry.get("underOdds"))),
+        moneyline_home=first(parse_american_odds(close(ml, "home", "odds")), parse_american_odds(home_t.get("moneyLine"))),
+        moneyline_away=first(parse_american_odds(close(ml, "away", "odds")), parse_american_odds(away_t.get("moneyLine"))),
+        timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    )
+    has_any = any(v is not None for k, v in odds.model_dump().items() if k not in ("provider", "timestamp"))
+    return odds if has_any else None
+
 class ESPNProvider(NBADataProvider):
     def __init__(self, cache_ttl_seconds: int = 120):
         self.cache_ttl = cache_ttl_seconds
@@ -147,42 +213,8 @@ class ESPNProvider(NBADataProvider):
             home_score = int(home_raw["score"]) if home_raw.get("score") and raw_state != "pre" else None
             away_score = int(away_raw["score"]) if away_raw.get("score") and raw_state != "pre" else None
 
-            # Parse odds
-            odds_item = None
             raw_odds = comp.get("odds", [])
-            if raw_odds:
-                o = raw_odds[0]
-                p_name = o.get("provider", {}).get("name", "DraftKings")
-                details = o.get("details", "")  # e.g. "BOS -5.5"
-                ou_val = o.get("overUnder")
-                
-                # Extract spread number
-                spread_val = None
-                if details:
-                    parts = details.split()
-                    try:
-                        spread_val = float(parts[-1])
-                        # If the details say "AWAY -4.5", then home spread is +4.5
-                        if away_team.abbreviation in parts[0] or away_team.name in details:
-                            spread_val = -spread_val
-                    except Exception:
-                        pass
-
-                ml_away_raw = o.get("awayTeamOdds", {}).get("moneyLine")
-                ml_home_raw = o.get("homeTeamOdds", {}).get("moneyLine")
-
-                odds_item = OddsItem(
-                    provider=p_name,
-                    spread=spread_val if spread_val is not None else -3.5,
-                    spread_home_odds=1.91,
-                    spread_away_odds=1.91,
-                    over_under=float(ou_val) if ou_val is not None else 225.5,
-                    over_odds=1.91,
-                    under_odds=1.91,
-                    moneyline_away=american_to_decimal(ml_away_raw) if ml_away_raw is not None else 2.10,
-                    moneyline_home=american_to_decimal(ml_home_raw) if ml_home_raw is not None else 1.77,
-                    timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                )
+            odds_item = parse_odds(raw_odds[0]) if raw_odds else None
 
             venue_name = comp.get("venue", {}).get("fullName", "")
 
@@ -274,28 +306,11 @@ class ESPNProvider(NBADataProvider):
                 target_game.injuries_home = injuries_home
                 target_game.injuries_away = injuries_away
 
-                # Parse pickcenter / odds details
+                # Parse pickcenter / odds details: csak akkor írja felül az árakat, ha van használható adat
                 pickcenter = data.get("pickcenter", [])
-                if pickcenter:
-                    pc = pickcenter[0]
-                    p_name = pc.get("provider", {}).get("name", "DraftKings")
-                    spread = pc.get("spread")
-                    ou = pc.get("overUnder")
-                    ml_away = pc.get("awayTeamOdds", {}).get("moneyLine")
-                    ml_home = pc.get("homeTeamOdds", {}).get("moneyLine")
-
-                    target_game.odds = OddsItem(
-                        provider=p_name,
-                        spread=float(spread) if spread is not None else (target_game.odds.spread if target_game.odds else -3.5),
-                        spread_home_odds=1.91,
-                        spread_away_odds=1.91,
-                        over_under=float(ou) if ou is not None else (target_game.odds.over_under if target_game.odds else 225.5),
-                        over_odds=1.91,
-                        under_odds=1.91,
-                        moneyline_away=american_to_decimal(ml_away) if ml_away is not None else (target_game.odds.moneyline_away if target_game.odds else 2.10),
-                        moneyline_home=american_to_decimal(ml_home) if ml_home is not None else (target_game.odds.moneyline_home if target_game.odds else 1.77),
-                        timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-                    )
+                detailed_odds = parse_odds(pickcenter[0]) if pickcenter else None
+                if detailed_odds:
+                    target_game.odds = detailed_odds
 
         except Exception as e:
             print(f"Error fetching game summary for {game_id}: {e}")

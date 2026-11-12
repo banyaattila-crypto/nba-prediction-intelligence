@@ -17,7 +17,8 @@ def make_game(game_id, hours_from_now=5, status="scheduled", odds=True):
     start = (datetime.now(timezone.utc) + timedelta(hours=hours_from_now)).strftime("%Y-%m-%dT%H:%MZ")
     return Game(
         id=game_id, date=start, status=status, home_team=t("h"), away_team=t("a"),
-        odds=OddsItem(provider="t", spread=-3.5, over_under=225.5, moneyline_home=1.8, moneyline_away=2.1) if odds else None,
+        odds=OddsItem(provider="t", spread=-3.5, spread_home_odds=1.91, spread_away_odds=1.91, over_under=225.5, over_odds=1.91,
+                      under_odds=1.91, moneyline_home=1.8, moneyline_away=2.1) if odds else None,
     )
 
 

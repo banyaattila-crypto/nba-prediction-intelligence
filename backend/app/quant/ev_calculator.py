@@ -4,7 +4,7 @@ from typing import Tuple, List, Dict, Any
 def american_to_decimal(american: float) -> float:
     """Convert American odds (+150, -110) to decimal odds (2.50, 1.91)."""
     if american is None or american == 0:
-        return 1.91
+        raise ValueError("Érvénytelen amerikai szorzó")
     if american > 0:
         return round(1.0 + (american / 100.0), 3)
     else:

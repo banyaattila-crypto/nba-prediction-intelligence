@@ -27,11 +27,11 @@ class Injury(BaseModel):
 class OddsItem(BaseModel):
     provider: str
     spread: Optional[float] = None
-    spread_home_odds: Optional[float] = 1.91
-    spread_away_odds: Optional[float] = 1.91
+    spread_home_odds: Optional[float] = None
+    spread_away_odds: Optional[float] = None
     over_under: Optional[float] = None
-    over_odds: Optional[float] = 1.91
-    under_odds: Optional[float] = 1.91
+    over_odds: Optional[float] = None
+    under_odds: Optional[float] = None
     moneyline_home: Optional[float] = None
     moneyline_away: Optional[float] = None
     timestamp: Optional[str] = None

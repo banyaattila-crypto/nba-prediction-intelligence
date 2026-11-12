@@ -1,8 +1,7 @@
 import React, { useState } from 'react'
 import { Check, Plus } from 'lucide-react'
 import PriceStrip from './PriceStrip'
-import { Mark } from './ui'
-import { ESTIMATED_PRICE_MARKETS, MARKET_LABEL, VERDICT_LABEL, isFlagged, num, pct, signed } from '../lib/format'
+import { MARKET_LABEL, VERDICT_LABEL, isFlagged, num, pct, signed } from '../lib/format'
 
 const VERDICT_STYLE = {
   STRONG_VALUE: 'border-ink bg-ink text-board',
@@ -23,7 +22,6 @@ function Fact({ term, children, hint }) {
 export default function PickCard({ pick, tracked, onTrack }) {
   const [busy, setBusy] = useState(false)
   const flagged = isFlagged(pick)
-  const priceAssumed = ESTIMATED_PRICE_MARKETS.has(pick.market)
   // Az indulás után rögzített tipp már az eredmény ismeretében születhetne; a szerver is elutasítja.
   const started = new Date(pick.game_date).getTime() <= Date.now()
 
@@ -47,14 +45,8 @@ export default function PickCard({ pick, tracked, onTrack }) {
 
       <div className="mt-2 flex items-end justify-between gap-4">
         <h3 className="font-display text-3xl font-extrabold uppercase leading-none tracking-wide">{pick.selection}</h3>
-        <p className={`tnum shrink-0 text-right font-mono text-xl font-semibold ${priceAssumed ? 'hatch rounded px-1.5' : ''}`}>
+        <p className="tnum shrink-0 text-right font-mono text-xl font-semibold">
           {num(pick.bookmaker_odds, 2)}
-          {priceAssumed && (
-            <>
-              {' '}
-              <Mark kind="assumed" title="Az ESPN nem ad szorzót erre a piacra, az 1,91 becsült alapérték" />
-            </>
-          )}
           <span className="block font-sans text-[11px] font-normal text-mute">{pick.bookmaker}</span>
         </p>
       </div>
@@ -74,12 +66,6 @@ export default function PickCard({ pick, tracked, onTrack }) {
           {pct(pick.uncertainty, 0)}
         </Fact>
       </dl>
-
-      {priceAssumed && (
-        <p className="mt-3 text-xs text-mute">
-          <Mark kind="assumed" /> A szorzó becsült (1,91), mert az ESPN erre a piacra nem ad árat. A várható hozam ezért tájékoztató jellegű.
-        </p>
-      )}
 
       {pick.reasoning?.length > 0 && (
         <details className="mt-3 text-sm">
