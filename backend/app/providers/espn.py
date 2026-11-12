@@ -1,6 +1,6 @@
 import time
 import httpx
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from app.providers.base import NBADataProvider
 from app.models.schemas import Game, Team, Injury, OddsItem
 from app.quant.ev_calculator import american_to_decimal
@@ -8,6 +8,14 @@ from app.quant.ev_calculator import american_to_decimal
 ESPN_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
 ESPN_SUMMARY_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
 ESPN_STANDINGS_URL = "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
+
+
+def estimate_ratings(ppg: float, opp_ppg: float) -> Tuple[float, float, float]:
+    """Becsült (tempó, ORtg, DRtg) a pontátlagokból; az ESPN tabella nem ad birtoklásszámot."""
+    # NBA average pace ~ 99.2 possessions/game
+    pace = round(98.5 + (ppg + opp_ppg - 224.0) * 0.15, 1)
+    pace = max(95.0, min(104.0, pace))
+    return pace, round(ppg / pace * 100.0, 1), round(opp_ppg / pace * 100.0, 1)
 
 
 def parse_american_odds(value: Any) -> Optional[float]:
@@ -112,13 +120,7 @@ class ESPNProvider(NBADataProvider):
                         diff = float(stats_map.get("differential", 0.0))
                         rank = int(stats_map.get("playoffSeed", 8))
                         
-                        # Estimated Pace and ORtg/DRtg
-                        # NBA average pace ~ 99.2 possessions/game
-                        estimated_pace = round(98.5 + (ppg + opp_ppg - 224.0) * 0.15, 1)
-                        estimated_pace = max(95.0, min(104.0, estimated_pace))
-                        
-                        ortg = round((ppg / estimated_pace) * 100.0, 1)
-                        drtg = round((opp_ppg / estimated_pace) * 100.0, 1)
+                        estimated_pace, ortg, drtg = estimate_ratings(ppg, opp_ppg)
 
                         team = Team(
                             id=t_id,

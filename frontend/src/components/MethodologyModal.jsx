@@ -17,7 +17,8 @@ const LIMITS = [
   'A pihenőnap és a hátizsák-meccs (back-to-back) hatása jelenleg nincs számolva, a rendszer mindig alapértéket használ.',
   'A sérülések hatása fix sztárlistából és általános alapértékből jön, nem aktuális játékosadatból.',
   'Az ORtg, DRtg és tempó a pontátlagokból becsült érték.',
-  'A szimuláció szórása fix érték, nincs hitelesítve valós eredményeken. Ez az eloszlás szélességét, így a valószínűségeket is befolyásolja.',
+  'A modell nem ad hozzá információt a piachoz (170 meccses visszamérés, 2026-10-20 – 11-12, kalibrációs súly: 0), ezért a jelzések a piaci valószínűséghez igazodnak. Kis minta: a CI széles, kis pozitív súly nem zárható ki.',
+  'A történelmi sérülések és pihenőnapok nem álltak rendelkezésre, ezért a sérülés- és pihenőhatás nem mérhető vissza.',
   'A záró vonal (CLV) rögzítése nincs megvalósítva.',
 ]
 
@@ -50,11 +51,21 @@ export default function MethodologyModal({ onClose }) {
 
         <Block title="3. Szimuláció">
           <p className="text-sm text-mute">
-            <Mark kind="model" /> Meccsenként 10 000 szimuláció normális pontszóródással (σ ≈ 11,5 pont csapatonként) és közös tempóingadozással. A várható pontszámot a csapatok becsült támadó- és védőhatékonysága, a hazai pálya és a sérülések adják.
+            <Mark kind="model" /> Meccsenként 10 000 szimuláció normális pontszóródással és közös tempóingadozással, a szezon valós eredményeiből mért szórásokkal (különbség 14,4, összpont 17,7). A várható pontszámot a csapatok becsült támadó- és védőhatékonysága, a hazai pálya és a sérülések adják.
           </p>
         </Block>
 
-        <Block title="4. Tétjavaslat">
+        <Block title="4. Kalibráció és horgonyzás">
+          <p className="text-sm text-mute">
+            A szezon 170 lejátszott meccsén (záró vonalakkal) megmértük a piac hibáját és a modell pontosságát pontbeli csapatértékeléssel (92 meccs). A modell pontatlanabb volt a piacnál (RMSE 15,4–16,2 szemben 14,3-mal), a piachoz keverés optimális súlya nulla körüli (95% CI −0,3 … +0,4), a nyers modell jelzett tippjeinek hozama pedig nem különbözött a vigtől (−8,9% szemben −7,8%-kal). Ezért a valószínűség a piaci és a nyers modell súlyozott keveréke, a modell súlya most 0:
+          </p>
+          <Formula>{'P_kalibrált = P_piac + súly · (P_modell − P_piac)      súly = 0'}</Formula>
+          <p className="text-sm text-mute">
+            A nyers modell a kártyákon látszik, de nem ez dönti el a jelzést. 8 pp-nél nagyobb eltérés sosem jelzés: a visszamérésben a nyers modell eltérésének mediánja 13,7 pp volt, ami modellzajra utalt. A súlyt csak újramérés emelheti (a <code className="font-mono">backend/calibration</code> mappa szkriptjei).
+          </p>
+        </Block>
+
+        <Block title="5. Tétjavaslat">
           <p className="text-sm text-mute">Negyed Kelly, legfeljebb 2,5 egység. Egy egység a bankroll 1%-a. A javaslat annyira megbízható, mint a modell valószínűsége.</p>
         </Block>
 

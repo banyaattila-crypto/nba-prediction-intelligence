@@ -28,7 +28,7 @@ function Matchup({ game, simulation }) {
         {simulation && (
           <div className="text-center">
             <p className="eyebrow mb-1">
-              <Mark kind="model" /> Modell szerinti végeredmény
+              <Mark kind="model" /> Nyers modell szerinti végeredmény
             </p>
             <p className="tnum font-display text-5xl font-extrabold leading-none">
               {num(simulation.expected_away_score, 0)}–{num(simulation.expected_home_score, 0)}
@@ -56,7 +56,7 @@ function Matchup({ game, simulation }) {
 
       {simulation && marketHome !== null && (
         <div className="mt-6 max-w-xl">
-          <PriceStrip label={`${home.abbreviation} győzelem`} market={marketHome} model={simulation.home_win_prob} />
+          <PriceStrip label={`${home.abbreviation} győzelem (nyers modell)`} market={marketHome} model={simulation.home_win_prob} />
         </div>
       )}
     </section>
@@ -74,7 +74,7 @@ function TotalDistribution({ buckets, line }) {
     <section aria-labelledby="dist-title">
       <h3 id="dist-title" className="font-display text-2xl font-extrabold uppercase tracking-wide">Összpontszám eloszlása</h3>
       <p className="mb-3 mt-1 text-sm text-mute">
-        <Mark kind="model" /> 10 000 szimulált meccs. {line != null && <>Narancs: a piaci vonal ({num(line, 1)}) sávja <Mark kind="market" />.</>}
+        <Mark kind="model" /> 10 000 szimulált meccs, a szórás a szezon valós eredményeiből kalibrált. {line != null && <>Narancs: a piaci vonal ({num(line, 1)}) sávja <Mark kind="market" />.</>}
       </p>
       <ol className="space-y-1">
         {parsed.map((b) => (
@@ -169,7 +169,7 @@ export default function GameDetailModal({ detail, onClose, onTrackPick, trackedI
 
             <section aria-labelledby="mk-title">
               <h3 id="mk-title" className="font-display text-2xl font-extrabold uppercase tracking-wide">Értékelt piacok</h3>
-              <p className="mb-3 mt-1 text-sm text-mute">Az eltérés a modell és a piac vig-mentes valószínűségének különbsége. Nem bizonyított előny.</p>
+              <p className="mb-3 mt-1 text-sm text-mute">Az eltérés a kalibrált modell és a piac vig-mentes valószínűségének különbsége. A kalibrált modell a piachoz húzott, a nyers modell külön látszik.</p>
               {analysis.picks.length === 0 ? (
                 <Notice tone="empty" title="Ehhez a meccshez nincs piaci ár">
                   Ár nélkül nem értékelhető piac.

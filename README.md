@@ -60,6 +60,16 @@ A backend alapértelmezetten a `http://127.0.0.1:8000` címen indul el (csak a h
 
 **Írásvédelem:** token nélkül írni csak a helyi gépről lehet, és csak olyan kérésből, amely nem idegen weboldalról (cross-origin) és nem DNS-rebinding úton érkezik. Fordított proxy mögött a kliens címe a proxy címe, ilyenkor mindenképp állítsd be az `API_WRITE_TOKEN`-t. Az olvasó végpontok nyitottak.
 
+**Kalibráció és visszamérés** (`backend/calibration/`, a backend mappából futtatva)
+
+```bash
+./venv/bin/python -B calibration/collect.py     # a szezon lejátszott meccsei + záró vonalak az ESPN-ről (~5 perc)
+./venv/bin/python -B calibration/analyze.py     # szórások, a modell pontossága, optimális piacsúly (bootstrap CI)
+./venv/bin/python -B calibration/backtest.py    # az éles tippgenerálás visszamérése (--weight W: más súllyal)
+```
+
+A modell súlyát (`app/quant/calibration.py`, `MODEL_WEIGHT`) csak olyan újramérés emelheti, amely a súlyt a nullától megkülönböztethetően pozitívnak mutatja. A 2026-11-12-i mérés (170 meccs) szerint a súly 0 körüli.
+
 ### 3. Frontend Fejlesztői Mód (Opcionális)
 Ha a frontend forráskódját módosítani szeretnéd:
 ```bash

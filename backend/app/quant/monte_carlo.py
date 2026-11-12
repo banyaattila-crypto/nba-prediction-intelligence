@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Dict, Any, List, Optional
 from app.models.schemas import MonteCarloSimulationResult
+from app.quant.calibration import MARGIN_SD, TOTAL_SD
 
 def run_monte_carlo_simulation(
     expected_home_score: float,
@@ -8,20 +9,23 @@ def run_monte_carlo_simulation(
     spread_line: Optional[float] = None,
     total_line: Optional[float] = None,
     simulations_count: int = 10000,
-    std_dev: float = 11.5,
+    margin_sd: float = MARGIN_SD,
+    total_sd: float = TOTAL_SD,
     seed: Optional[int] = 42
 ) -> MonteCarloSimulationResult:
     """
     Vectorized Monte Carlo simulation of NBA game scoring.
-    Simulates `simulations_count` independent outcomes based on expected ratings and historical standard deviation.
+    Simulates `simulations_count` outcomes around the expected scores. The noise is set so that the simulated
+    margin and total have the standard deviations measured on real results (see app/quant/calibration.py).
     """
     rng = np.random.default_rng(seed)
-    
-    # Generate random scoring distributions
-    # NBA scores exhibit a small positive correlation (approx 0.15) due to game pace fluctuation
-    pace_jitter = rng.normal(0, 2.5, simulations_count)
-    home_noise = rng.normal(0, std_dev, simulations_count) + pace_jitter
-    away_noise = rng.normal(0, std_dev, simulations_count) + pace_jitter
+
+    # Team noise s gives margin variance 2*s^2; the shared pace noise j adds 4*j^2 to the total variance only.
+    team_sd = margin_sd / np.sqrt(2.0)
+    pace_sd = np.sqrt(max(total_sd ** 2 - margin_sd ** 2, 0.0)) / 2.0
+    pace_jitter = rng.normal(0, pace_sd, simulations_count)
+    home_noise = rng.normal(0, team_sd, simulations_count) + pace_jitter
+    away_noise = rng.normal(0, team_sd, simulations_count) + pace_jitter
     
     home_sim_scores = np.maximum(70.0, expected_home_score + home_noise)
     away_sim_scores = np.maximum(70.0, expected_away_score + away_noise)

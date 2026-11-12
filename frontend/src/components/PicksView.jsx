@@ -12,6 +12,7 @@ export default function PicksView({ picks, performance, trackedIds, onTrackPick,
   const [onlyFlagged, setOnlyFlagged] = useState(true)
 
   const all = picks.data ?? []
+  const anyFlagged = all.some(isFlagged)
   const shown = all.filter((p) => (!onlyFlagged || isFlagged(p)) && (market === 'ALL' || p.market === market) && p.edge >= minEdge)
   const resetFilters = () => {
     setMarket('ALL')
@@ -78,16 +79,20 @@ export default function PicksView({ picks, performance, trackedIds, onTrackPick,
         {picks.status !== 'loading' && picks.status !== 'error' && shown.length === 0 && (
           <Notice
             tone="empty"
-            title={all.length === 0 ? 'Ma nincs értékelhető piac' : 'A szűrőknek egy piac sem felel meg'}
+            title={all.length === 0 ? 'Ma nincs értékelhető piac' : !anyFlagged ? 'A kalibrált modell ma nem tér el a piactól' : 'A szűrőknek egy piac sem felel meg'}
             action={
               all.length > 0 && (
                 <button type="button" onClick={resetFilters} className="btn btn-ghost border-ink">
-                  Szűrők törlése
+                  {anyFlagged ? 'Szűrők törlése' : 'Minden piac mutatása'}
                 </button>
               )
             }
           >
-            {all.length === 0 ? 'Az értékeléshez piaci árak kellenek. Ha nincs mai meccs vagy ár, nincs mit összevetni.' : `${all.length} értékelt piac van, de egyik sem teljesíti a beállított feltételeket.`}
+            {all.length === 0
+              ? 'Az értékeléshez piaci árak kellenek. Ha nincs mai meccs vagy ár, nincs mit összevetni.'
+              : !anyFlagged
+                ? 'A 170 meccses visszamérés szerint a modell nem ad hozzá információt a záró vonalhoz (lásd Módszertan), ezért a jelzés a piaci valószínűséghez igazodik. A piacok mutatásával a nyers modell és a piac összevetése is látszik.'
+                : `${all.length} értékelt piac van, de egyik sem teljesíti a beállított feltételeket.`}
           </Notice>
         )}
 

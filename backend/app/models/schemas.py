@@ -68,7 +68,8 @@ class PickRecommendation(BaseModel):
     bookmaker: str
     implied_prob: float  # raw implied prob 1 / odds
     fair_implied_prob: float  # vig-removed prob
-    model_prob: float
+    model_prob: float  # kalibrált (a piachoz húzott) valószínűség; ebből számolódik az eltérés, az EV és a tét
+    raw_model_prob: Optional[float] = None  # a szimuláció nyers eredménye, a kalibráció előtt
     edge: float  # model_prob - fair_implied_prob
     ev: float  # expected value %
     kelly_stake: float  # fractional kelly unit sizing (0.0 - 2.5 units)

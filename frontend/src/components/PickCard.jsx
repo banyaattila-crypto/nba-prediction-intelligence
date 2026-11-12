@@ -52,15 +52,18 @@ export default function PickCard({ pick, tracked, onTrack }) {
       </div>
 
       <div className="mt-4">
-        <PriceStrip label="Valószínűség" market={pick.fair_implied_prob} model={pick.model_prob} />
+        <PriceStrip label="Valószínűség (kalibrált modell)" market={pick.fair_implied_prob} model={pick.model_prob} />
       </div>
 
-      <dl className="mt-4 grid grid-cols-3 gap-3 border-t pt-3">
+      <dl className="mt-4 grid grid-cols-2 gap-3 border-t pt-3 sm:grid-cols-4">
         <Fact term="Várható hozam" hint="A modell valószínűsége és a szorzó alapján; csak annyira megbízható, mint a modell.">
           {signed(pick.ev, 1)}%
         </Fact>
         <Fact term="Javasolt tét" hint="Negyed Kelly, egységben; 0 = nincs javaslat">
           {pick.kelly_stake > 0 ? `${num(pick.kelly_stake, 1)} egység` : '—'}
+        </Fact>
+        <Fact term="Nyers modell" hint="A szimuláció eredménye a kalibráció előtt. Nem ez határozza meg a jelzést: a visszamérés szerint a modell nem ad hozzá információt a piachoz.">
+          {pct(pick.raw_model_prob, 1)}
         </Fact>
         <Fact term="Bizonytalanság" hint="Sérülések és játékosállapot miatti bizonytalansági index">
           {pct(pick.uncertainty, 0)}

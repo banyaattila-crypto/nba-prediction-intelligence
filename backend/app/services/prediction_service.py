@@ -2,6 +2,8 @@ import time
 from typing import List, Optional, Any
 from app.models.schemas import Game, GameAnalysis, PickRecommendation
 from app.quant.ratings import calculate_matchup_ratings
+from app.quant import calibration
+from app.quant.calibration import TOTAL_SD, blend_probability
 from app.quant.monte_carlo import run_monte_carlo_simulation
 from app.quant.ev_calculator import (
     decimal_to_implied_prob,
@@ -53,7 +55,7 @@ class PredictionService:
             key_factors.append("Vendég csapat utazási terhelés alatt (B2B fáradtság)")
 
         key_factors.append(f"Várható tempó: {matchup_data['expected_pace']} birtoklás / 48 perc")
-        key_factors.append(f"Modell pontbecslés: {game.home_team.abbreviation} {matchup_data['expected_home_score']} - {matchup_data['expected_away_score']} {game.away_team.abbreviation}")
+        key_factors.append(f"Nyers modell pontbecslés: {game.home_team.abbreviation} {matchup_data['expected_home_score']} - {matchup_data['expected_away_score']} {game.away_team.abbreviation}")
 
         return GameAnalysis(
             game=game,
@@ -226,14 +228,11 @@ class PredictionService:
         # ---------------- 3. TOTALS (OVER / UNDER) MARKET ----------------
         if odds.over_under is not None and odds.over_odds and odds.under_odds:
             tot_line = odds.over_under
-            # Probability from Monte Carlo
-            # Normal distribution approximation on sim totals
-            over_count = sum(item["count"] for item in sim.total_distribution if float(item["range"].split("-")[0]) >= tot_line)
-            # More accurate continuous CDF calculation using normal approximation
+            # A total valószínűsége normális közelítéssel, a szezon valós eredményeiből mért szórással
             import scipy.stats as stats
             sim_tot_mean = sim.expected_total
-            sim_tot_std = 16.5  # standard total deviation in NBA
-            
+            sim_tot_std = TOTAL_SD
+
             p_under = round(float(stats.norm.cdf(tot_line, loc=sim_tot_mean, scale=sim_tot_std)), 4)
             p_over = round(1.0 - p_under, 4)
             
@@ -303,4 +302,30 @@ class PredictionService:
                 timestamp=now_str
             ))
 
+        for pick in picks:
+            self._anchor_to_market(pick)
         return picks
+
+    @staticmethod
+    def _anchor_to_market(pick: PickRecommendation) -> None:
+        """A nyers modellvalószínűséget a piacihoz húzza (calibration.MODEL_WEIGHT), és ebből számolja újra az
+        eltérést, a várható hozamot, a minősítést és a tétet. A nyers érték a raw_model_prob mezőben marad."""
+        raw = pick.model_prob
+        p = blend_probability(raw, pick.fair_implied_prob)
+        pick.raw_model_prob = raw
+        pick.model_prob = p
+        pick.edge = calculate_edge(p, pick.fair_implied_prob)
+        pick.ev = calculate_ev(p, pick.bookmaker_odds)
+        pick.verdict, pick.confidence = evaluate_verdict(pick.edge, pick.ev, pick.uncertainty)
+        if abs(pick.edge) > calibration.MAX_PLAUSIBLE_EDGE_PP:
+            pick.verdict, pick.confidence = "PASS", "LOW"
+            pick.reasoning.append(
+                f"Hihetőségi védelem: a {round(pick.edge, 1)} pp eltérés nagyobb, mint {calibration.MAX_PLAUSIBLE_EDGE_PP} pp, "
+                "ilyen eltérés a visszamérésben modellzajra utalt, ezért nem jelzés."
+            )
+        pick.kelly_stake = calculate_kelly_stake(p, pick.bookmaker_odds) if pick.verdict != "PASS" else 0.0
+        pick.reasoning.append(
+            f"Kalibráció: nyers modell {round(raw * 100, 1)}%, piac {round(pick.fair_implied_prob * 100, 1)}%, "
+            f"a modell súlya {round(calibration.MODEL_WEIGHT * 100)}% (a 170 meccses visszamérés szerint a modell nem ad "
+            f"hozzá információt a záró vonalhoz) -> kalibrált valószínűség {round(p * 100, 1)}%."
+        )
