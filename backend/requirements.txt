@@ -1,0 +1,8 @@
+# Futásidejű függőségek (közvetlenek, pontos verzióval). Python 3.12.
+# A teljes, tranzitív függőségekkel együtt rögzített készlet: requirements.lock
+fastapi==0.162.4
+uvicorn==0.54.0
+httpx==0.28.1
+numpy==2.5.4
+scipy==1.18.1
+pydantic==2.14.3
