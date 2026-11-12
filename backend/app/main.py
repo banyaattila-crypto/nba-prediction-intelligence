@@ -1,10 +1,12 @@
 import os
+from datetime import date as date_cls, datetime, timedelta, timezone
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from app.providers.espn import ESPNProvider
 from app.services.prediction_service import PredictionService
-from app.services.tracker_service import TrackerService
+from app.services.tracker_service import TrackerService, TrackerStorageError
+from fastapi.responses import JSONResponse
 from app.models.schemas import (
     Game,
     GameAnalysis,
@@ -28,6 +30,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(TrackerStorageError)
+async def tracker_storage_error_handler(request, exc: TrackerStorageError):
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 provider = ESPNProvider()
 prediction_service = PredictionService()
@@ -58,6 +64,10 @@ async def get_game_analysis(game_id: str):
     analysis = prediction_service.analyze_game(game)
     return analysis
 
+def _scheduled(games):
+    """Csak a még el nem kezdődött meccsek értékelhetők: az indulás után a modell és az ár már nem összevethető."""
+    return [g for g in games if g.status == "scheduled"]
+
 @app.get("/api/picks", response_model=List[PickRecommendation])
 async def get_all_picks(
     market: Optional[str] = Query(None, description="MONEYLINE, SPREAD, TOTAL_OVER, TOTAL_UNDER"),
@@ -66,7 +76,7 @@ async def get_all_picks(
     verdict: Optional[str] = Query(None, description="STRONG_VALUE, VALUE, or PASS")
 ):
     """Retrieve generated picks across all current games with quantitative filters."""
-    games = await provider.get_today_games()
+    games = _scheduled(await provider.get_today_games())
     all_picks: List[PickRecommendation] = []
     
     for g in games:
@@ -92,7 +102,7 @@ async def get_all_picks(
 @app.get("/api/picks/top", response_model=List[PickRecommendation])
 async def get_top_value_picks():
     """Retrieve the top positive EV opportunities for the day (Edge >= 2.0% and EV >= 2.5%)."""
-    games = await provider.get_today_games()
+    games = _scheduled(await provider.get_today_games())
     top_picks: List[PickRecommendation] = []
     for g in games:
         detailed_g = await provider.get_game_details(g.id) or g
@@ -106,8 +116,38 @@ async def get_top_value_picks():
 @app.post("/api/picks/track")
 async def track_pick(pick: PickRecommendation, units: float = 1.0):
     """Add a pick to the user's tracked paper-trading portfolio."""
+    # Look-ahead védelem: az indulás után rögzített tipp már az eredmény ismeretében születhetne.
+    try:
+        start = datetime.fromisoformat(pick.game_date.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=422, detail="A meccs időpontja nem értelmezhető, a tipp nem rögzíthető.")
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    if start <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=409, detail="A meccs már elkezdődött, utólag nem rögzíthető tipp.")
     recorded = tracker_service.record_pick(pick, units=units)
     return {"message": "Tipp sikeresen rögzítve", "pick": recorded}
+
+@app.post("/api/history/settle")
+async def settle_history():
+    """A függő tippek lezárása a lejátszott meccsek végeredménye alapján (ESPN)."""
+    pending = [p for p in tracker_service.get_history() if p.result == "PENDING"]
+    if not pending:
+        return {"settled": 0, "still_pending": 0, "unsettleable": 0}
+    # A tipp dátuma UTC; az ESPN amerikai napokra bont, ezért az előző napot is lekérjük.
+    days = set()
+    for p in pending:
+        try:
+            d = date_cls.fromisoformat(p.date)
+        except ValueError:
+            continue
+        days.update({d - timedelta(days=1), d})
+    finals = {}
+    for d in sorted(days):
+        for g in await provider.get_today_games(date_str=d.strftime("%Y%m%d")):
+            if g.status == "final":
+                finals[g.id] = g
+    return tracker_service.settle_pending(finals)
 
 @app.get("/api/performance", response_model=PerformanceStats)
 async def get_performance():
@@ -132,15 +172,24 @@ async def get_standings():
     return teams_list
 
 # Serve compiled frontend in production if dist exists
-frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
-if os.path.exists(frontend_dist):
-    from fastapi.staticfiles import StaticFiles
+frontend_dist = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "..", "frontend", "dist"))
+if os.path.isdir(frontend_dist):
     from starlette.responses import FileResponse
+
+    def _safe_dist_file(rel_path: str):
+        """A dist mappán belüli, létező fájl valós útvonala; egyébként None (path traversal ellen)."""
+        try:
+            candidate = os.path.realpath(os.path.join(frontend_dist, rel_path))
+            if os.path.commonpath([frontend_dist, candidate]) != frontend_dist:
+                return None
+        except ValueError:  # NUL-bájt, eltérő meghajtó
+            return None
+        return candidate if os.path.isfile(candidate) else None
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
-        file_path = os.path.join(frontend_dist, full_path)
-        if os.path.exists(file_path) and os.path.isfile(file_path):
+        file_path = _safe_dist_file(full_path)
+        if file_path:
             return FileResponse(file_path)
         return FileResponse(os.path.join(frontend_dist, "index.html"))
 

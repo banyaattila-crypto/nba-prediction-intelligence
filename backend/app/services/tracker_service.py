@@ -1,31 +1,65 @@
 import os
 import json
-from typing import List, Optional
-from app.models.schemas import HistoricalPick, PerformanceStats, PickRecommendation
+import tempfile
+import threading
+from typing import Dict, List, Optional
+from app.models.schemas import Game, HistoricalPick, PerformanceStats, PickRecommendation
+from app.services.settlement import grade, parse_pick_id, profit_loss
 from app.quant.backtest import calculate_performance_summary
 
 DATA_FILE_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "historical_picks.json")
 
+
+class TrackerStorageError(RuntimeError):
+    """A tippnapló nem olvasható vagy nem írható. A fájlt ilyenkor NEM írjuk felül."""
+
+
+def _write_json_atomic(path: str, items: List[HistoricalPick]) -> None:
+    """Atomi írás: ideiglenes fájl ugyanabban a mappában, fsync, majd os.replace."""
+    directory = os.path.dirname(path)
+    fd, tmp_path = tempfile.mkstemp(dir=directory, prefix=".historical_", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump([p.model_dump() for p in items], f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
 class TrackerService:
+    # Egy folyamaton belüli olvasás-módosítás-írás védelme. Több worker/folyamat esetén
+    # fájlzár vagy adatbázis kell (lásd audit F2).
+    _lock = threading.RLock()
+
     def __init__(self):
         self._ensure_data_file()
 
     def _ensure_data_file(self):
         os.makedirs(os.path.dirname(DATA_FILE_PATH), exist_ok=True)
-        if not os.path.exists(DATA_FILE_PATH):
-            sample_history = self._generate_sample_history()
-            with open(DATA_FILE_PATH, "w", encoding="utf-8") as f:
-                json.dump([p.model_dump() for p in sample_history], f, indent=2)
+        with self._lock:
+            if not os.path.exists(DATA_FILE_PATH):
+                _write_json_atomic(DATA_FILE_PATH, [])
 
     def get_history(self) -> List[HistoricalPick]:
         try:
             with open(DATA_FILE_PATH, "r", encoding="utf-8") as f:
                 raw = json.load(f)
-                return [HistoricalPick(**item) for item in raw]
-        except Exception:
-            return []
+            return [HistoricalPick(**item) for item in raw]
+        except Exception as e:
+            # Korábban: `return []`, amit a record_pick felülírt -> a teljes napló elveszett.
+            raise TrackerStorageError(f"A tippnapló nem olvasható ({type(e).__name__}): {e}") from e
 
     def record_pick(self, pick: PickRecommendation, units: float = 1.0) -> HistoricalPick:
+        with self._lock:
+            return self._record_pick_locked(pick, units)
+
+    def _record_pick_locked(self, pick: PickRecommendation, units: float) -> HistoricalPick:
         history = self.get_history()
         # Avoid duplicate
         existing = next((p for p in history if p.id == pick.id), None)
@@ -45,79 +79,44 @@ class TrackerService:
             units_staked=units,
             result="PENDING",
             profit_loss=0.0,
-            closing_odds=pick.bookmaker_odds,
-            clv_edge=0.0
+            line=pick.line,
+            closing_odds=None,  # a záró vonal rögzítése nincs implementálva -> nincs CLV
+            clv_edge=None
         )
         history.append(new_hist)
-        with open(DATA_FILE_PATH, "w", encoding="utf-8") as f:
-            json.dump([p.model_dump() for p in history], f, indent=2)
+        try:
+            _write_json_atomic(DATA_FILE_PATH, history)
+        except OSError as e:
+            raise TrackerStorageError(f"A tippnapló nem írható: {e}") from e
         return new_hist
 
     def get_performance_stats(self) -> PerformanceStats:
         history = self.get_history()
         return calculate_performance_summary(history)
 
-    def _generate_sample_history(self) -> List[HistoricalPick]:
-        """Realistic sample history from the past 2 weeks for calibration & ROI validation."""
-        return [
-            HistoricalPick(
-                id="hist_1", date="2026-11-04", matchup="BOS @ GSW", market="SPREAD",
-                selection="BOS -4.5", odds=1.91, model_prob=0.584, ev=11.5, edge=6.2,
-                units_staked=1.5, result="WON", profit_loss=1.36, closing_odds=1.82, clv_edge=4.9
-            ),
-            HistoricalPick(
-                id="hist_2", date="2026-11-04", matchup="OKC @ DEN", market="TOTAL_UNDER",
-                selection="Under 226.5", odds=1.91, model_prob=0.562, ev=7.3, edge=4.0,
-                units_staked=1.0, result="WON", profit_loss=0.91, closing_odds=1.87, clv_edge=2.1
-            ),
-            HistoricalPick(
-                id="hist_3", date="2026-11-05", matchup="NY @ ATL", market="MONEYLINE",
-                selection="New York Knicks Győzelem", odds=1.85, model_prob=0.590, ev=9.1, edge=4.9,
-                units_staked=1.2, result="LOST", profit_loss=-1.20, closing_odds=1.78, clv_edge=3.9
-            ),
-            HistoricalPick(
-                id="hist_4", date="2026-11-06", matchup="CLE @ DET", market="SPREAD",
-                selection="CLE -8.5", odds=1.91, model_prob=0.620, ev=18.4, edge=9.8,
-                units_staked=2.0, result="WON", profit_loss=1.82, closing_odds=1.75, clv_edge=9.1
-            ),
-            HistoricalPick(
-                id="hist_5", date="2026-11-06", matchup="MIA @ PHX", market="TOTAL_OVER",
-                selection="Over 219.5", odds=1.95, model_prob=0.551, ev=7.4, edge=3.8,
-                units_staked=1.0, result="LOST", profit_loss=-1.0, closing_odds=1.92, clv_edge=1.5
-            ),
-            HistoricalPick(
-                id="hist_6", date="2026-11-07", matchup="LAL @ MEM", market="MONEYLINE",
-                selection="Memphis Grizzlies Győzelem", odds=2.10, model_prob=0.525, ev=10.2, edge=4.9,
-                units_staked=1.0, result="WON", profit_loss=1.10, closing_odds=1.98, clv_edge=6.0
-            ),
-            HistoricalPick(
-                id="hist_7", date="2026-11-08", matchup="MIL @ NY", market="TOTAL_UNDER",
-                selection="Under 231.5", odds=1.91, model_prob=0.575, ev=9.8, edge=5.3,
-                units_staked=1.2, result="WON", profit_loss=1.09, closing_odds=1.85, clv_edge=3.2
-            ),
-            HistoricalPick(
-                id="hist_8", date="2026-11-09", matchup="SAS @ UTA", market="SPREAD",
-                selection="SAS -3.5", odds=1.91, model_prob=0.540, ev=3.1, edge=1.8,
-                units_staked=0.5, result="WON", profit_loss=0.45, closing_odds=1.90, clv_edge=0.5
-            ),
-            HistoricalPick(
-                id="hist_9", date="2026-11-09", matchup="HOU @ DAL", market="TOTAL_OVER",
-                selection="Over 224.5", odds=1.91, model_prob=0.565, ev=7.9, edge=4.3,
-                units_staked=1.0, result="LOST", profit_loss=-1.0, closing_odds=1.89, clv_edge=1.0
-            ),
-            HistoricalPick(
-                id="hist_10", date="2026-11-10", matchup="BOS @ BKN", market="SPREAD",
-                selection="BOS -11.5", odds=1.91, model_prob=0.612, ev=16.8, edge=9.0,
-                units_staked=1.8, result="WON", profit_loss=1.63, closing_odds=1.80, clv_edge=6.1
-            ),
-            HistoricalPick(
-                id="hist_11", date="2026-11-10", matchup="SAC @ PHX", market="MONEYLINE",
-                selection="Sacramento Kings Győzelem", odds=2.25, model_prob=0.488, ev=9.8, edge=4.4,
-                units_staked=0.8, result="WON", profit_loss=1.00, closing_odds=2.10, clv_edge=7.1
-            ),
-            HistoricalPick(
-                id="hist_12", date="2026-11-11", matchup="DEN @ OKC", market="SPREAD",
-                selection="OKC -4.5", odds=1.91, model_prob=0.570, ev=8.8, edge=4.8,
-                units_staked=1.0, result="WON", profit_loss=0.91, closing_odds=1.86, clv_edge=2.7
-            )
-        ]
+    def settle_pending(self, final_games: Dict[str, Game]) -> Dict[str, int]:
+        """A függő tippeket a lejátszott meccsek végeredménye alapján zárja le."""
+        with self._lock:
+            history = self.get_history()
+            settled = unsettleable = still_pending = 0
+            for p in history:
+                if p.result != "PENDING":
+                    continue
+                parsed = parse_pick_id(p.id)
+                game = final_games.get(parsed[0]) if parsed else None
+                if not parsed or game is None or game.home_score is None or game.away_score is None:
+                    still_pending += 1
+                    continue
+                result = grade(parsed[1], p.line, game.home_score, game.away_score)
+                if result is None:
+                    unsettleable += 1
+                    continue
+                p.result = result
+                p.profit_loss = profit_loss(result, p.units_staked, p.odds)
+                settled += 1
+            if settled:
+                try:
+                    _write_json_atomic(DATA_FILE_PATH, history)
+                except OSError as e:
+                    raise TrackerStorageError(f"A tippnapló nem írható: {e}") from e
+            return {"settled": settled, "still_pending": still_pending, "unsettleable": unsettleable}

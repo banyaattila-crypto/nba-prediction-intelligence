@@ -1,14 +1,17 @@
 import math
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.models.schemas import HistoricalPick, PerformanceStats
 
-def calculate_brier_score(predictions: List[Dict[str, Any]]) -> float:
+MIN_RELIABLE_SAMPLE = 50
+
+
+def calculate_brier_score(predictions: List[Dict[str, Any]]) -> Optional[float]:
     """
     Compute Brier Score: lower is better (0 = perfect calibration, 0.25 = random 50/50 guessing).
     prediction dict needs 'model_prob' and 'outcome' (1 for win, 0 for loss).
     """
     if not predictions:
-        return 0.20
+        return None
     squared_errors = []
     for p in predictions:
         prob = p.get("model_prob", 0.5)
@@ -45,12 +48,13 @@ def calculate_calibration_curve(picks: List[HistoricalPick], num_bins: int = 5) 
                 "delta": round((actual_rate - avg_pred) * 100, 1)
             })
         else:
+            # Üres sávban nincs mérés: nem tüntetjük fel tökéletes kalibrációnak.
             results.append({
                 "bucket": b["label"],
                 "count": 0,
-                "avg_pred_prob": round(((b["min"] + b["max"]) / 2) * 100, 1),
-                "actual_win_rate": round(((b["min"] + b["max"]) / 2) * 100, 1),
-                "delta": 0.0
+                "avg_pred_prob": None,
+                "actual_win_rate": None,
+                "delta": None
             })
     return results
 
@@ -71,13 +75,14 @@ def calculate_performance_summary(picks: List[HistoricalPick]) -> PerformanceSta
     # CLV (Closing Line Value)
     with_clv = [p for p in completed if p.clv_edge is not None]
     pos_clv = sum(1 for p in with_clv if p.clv_edge > 0)
-    clv_rate = round((pos_clv / len(with_clv) * 100.0) if with_clv else 64.5, 1)
+    clv_rate = round(pos_clv / len(with_clv) * 100.0, 1) if with_clv else None
     
     # Brier
-    brier = calculate_brier_score([{"model_prob": p.model_prob, "result": p.result} for p in completed])
+    scored = [p for p in completed if p.result in ("WON", "LOST")]  # PUSH-nak nincs bináris kimenete
+    brier = calculate_brier_score([{"model_prob": p.model_prob, "result": p.result} for p in scored])
     
     # Calibration
-    calib = calculate_calibration_curve(completed)
+    calib = calculate_calibration_curve(scored)
     
     return PerformanceStats(
         total_picks=total,
@@ -91,5 +96,8 @@ def calculate_performance_summary(picks: List[HistoricalPick]) -> PerformanceSta
         roi_percent=roi_percent,
         brier_score=brier,
         clv_positive_rate=clv_rate,
+        clv_tracked_picks=len(with_clv),
+        min_reliable_sample=MIN_RELIABLE_SAMPLE,
+        reliable_sample=len(scored) >= MIN_RELIABLE_SAMPLE,
         calibration_data=calib
     )

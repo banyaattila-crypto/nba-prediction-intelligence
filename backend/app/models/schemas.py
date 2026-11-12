@@ -110,6 +110,7 @@ class HistoricalPick(BaseModel):
     units_staked: float
     result: str  # WON, LOST, PUSH
     profit_loss: float
+    line: Optional[float] = None  # hendikep / total vonal a rögzítéskor (az elszámoláshoz kell)
     closing_odds: Optional[float] = None
     clv_edge: Optional[float] = None
 
@@ -123,6 +124,9 @@ class PerformanceStats(BaseModel):
     total_units_staked: float
     total_profit_units: float
     roi_percent: float
-    brier_score: float
-    clv_positive_rate: float
+    brier_score: Optional[float] = None  # None, amíg nincs lezárt tipp
+    clv_positive_rate: Optional[float] = None  # None, amíg nincs rögzített záró vonal
+    clv_tracked_picks: int = 0
+    min_reliable_sample: int = 50
+    reliable_sample: bool = False  # a lezárt tippek száma elér-e egy értelmezhető mintaméretet
     calibration_data: List[Dict[str, Any]]
