@@ -3,7 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 export async function errorText(res) {
   try {
     const body = await res.json()
-    if (body && typeof body.detail === 'string') return body.detail
+    // A szerver üzenete ponttal zárul, a felület szövegei maguk teszik ki a pontot.
+    if (body && typeof body.detail === 'string') return body.detail.replace(/[.\s]+$/, '')
   } catch {
     /* nem JSON válasz */
   }

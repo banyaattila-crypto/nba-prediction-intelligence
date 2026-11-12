@@ -145,6 +145,9 @@ class StubProvider:
     async def get_game_details(self, game_id):
         return next((g for g in self.games if g.id == game_id), None)
 
+    async def get_team_standings(self):
+        return getattr(self, "standings", {})
+
 
 def test_picks_only_for_scheduled_games(monkeypatch):
     odds = OddsItem(provider="t", spread=-3.5, spread_home_odds=1.91, spread_away_odds=1.91, over_under=225.5, over_odds=1.91, under_odds=1.91,

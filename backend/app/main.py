@@ -5,6 +5,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from app.providers.espn import ESPNProvider
 from app.services.prediction_service import PredictionService
+from app.errors import DataSourceError, InsufficientDataError
 from app.security import allowed_origins, require_write_access
 from app.services.settlement import parse_pick_id
 from app.services.tracker_service import TrackerService, TrackerStorageError
@@ -33,6 +34,10 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "Authorization"],
 )
+
+@app.exception_handler(DataSourceError)
+async def data_source_error_handler(request, exc: DataSourceError):
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 @app.exception_handler(TrackerStorageError)
 async def tracker_storage_error_handler(request, exc: TrackerStorageError):
@@ -68,8 +73,13 @@ async def get_game_analysis(game_id: str):
     return analysis
 
 def _scheduled(games):
-    """Csak a még el nem kezdődött meccsek értékelhetők: az indulás után a modell és az ár már nem összevethető."""
-    return [g for g in games if g.status == "scheduled"]
+    """Csak a még el nem kezdődött, értékelhető meccsek: az indulás után a modell és az ár már nem összevethető,
+    csapatstatisztika nélkül pedig nincs mire építeni a modellt."""
+    upcoming = [g for g in games if g.status == "scheduled"]
+    rated = [g for g in upcoming if g.home_team.has_ratings and g.away_team.has_ratings]
+    if upcoming and not rated:
+        raise InsufficientDataError("A csapatstatisztika nem érhető el (az ESPN tabella nem tölthető be), ezért a mai meccsek nem értékelhetők.")
+    return rated
 
 @app.get("/api/picks", response_model=List[PickRecommendation])
 async def get_all_picks(
@@ -181,6 +191,8 @@ async def get_history_picks():
 async def get_standings():
     """Retrieve 30 NBA teams with standings, ratings and pace."""
     standings = await provider.get_team_standings()
+    if not standings:
+        raise DataSourceError("Az ESPN tabella nem érhető el.")
     # Unique team list
     unique_teams = {}
     for k, v in standings.items():

@@ -91,7 +91,7 @@ function TotalDistribution({ buckets, line }) {
   )
 }
 
-function Injuries({ team, list }) {
+function Injuries({ team, list, known }) {
   return (
     <section aria-label={`${team.display_name} sérülésjelentés`}>
       <h4 className="mb-2 flex items-baseline justify-between font-semibold">
@@ -99,7 +99,7 @@ function Injuries({ team, list }) {
         <span className="tnum font-mono text-xs font-normal text-mute">{list.length} játékos</span>
       </h4>
       {list.length === 0 ? (
-        <p className="text-sm text-mute">Az ESPN nem jelez hiányzót.</p>
+        <p className="text-sm text-mute">{known ? 'Az ESPN nem jelez hiányzót.' : 'A sérüléslista most nem érhető el, ezért nem tudjuk, van-e hiányzó. A modell hiányzók nélkül számol.'}</p>
       ) : (
         <ul className="divide-y rounded-md border bg-paper">
           {list.map((inj, i) => (
@@ -162,8 +162,8 @@ export default function GameDetailModal({ detail, onClose, onTrackPick, trackedI
                 A lista az ESPN-ről jön <Mark kind="source" />. A hatásuk a modellben becsült érték <Mark kind="assumed" />: ismert sztárokra fix lista, a többi játékosra általános alapérték.
               </p>
               <div className="grid gap-6 md:grid-cols-2">
-                <Injuries team={analysis.game.away_team} list={analysis.game.injuries_away} />
-                <Injuries team={analysis.game.home_team} list={analysis.game.injuries_home} />
+                <Injuries team={analysis.game.away_team} list={analysis.game.injuries_away} known={analysis.game.injuries_known} />
+                <Injuries team={analysis.game.home_team} list={analysis.game.injuries_home} known={analysis.game.injuries_known} />
               </div>
             </section>
 

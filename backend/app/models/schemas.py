@@ -17,6 +17,7 @@ class Team(BaseModel):
     ortg: float = 112.0
     drtg: float = 112.0
     pace: float = 99.0
+    has_ratings: bool = True  # False: a csapat nincs a tabellában, a mutatók nem valódiak, értékelésre nem használhatók
 
 class Injury(BaseModel):
     player_name: str
@@ -51,6 +52,7 @@ class Game(BaseModel):
     odds: Optional[OddsItem] = None
     injuries_home: List[Injury] = []
     injuries_away: List[Injury] = []
+    injuries_known: bool = False  # True: a sérüléslistát az ESPN részletes végpontja tényleg megadta
     home_rest_days: int = 1
     away_rest_days: int = 1
     home_is_b2b: bool = False

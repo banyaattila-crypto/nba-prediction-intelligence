@@ -1,6 +1,8 @@
+import logging
 import time
 import httpx
 from typing import List, Optional, Dict, Any, Tuple
+from app.errors import DataSourceError
 from app.providers.base import NBADataProvider
 from app.models.schemas import Game, Team, Injury, OddsItem
 from app.quant.ev_calculator import american_to_decimal
@@ -8,6 +10,9 @@ from app.quant.ev_calculator import american_to_decimal
 ESPN_SCOREBOARD_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard"
 ESPN_SUMMARY_URL = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/summary"
 ESPN_STANDINGS_URL = "https://site.api.espn.com/apis/v2/sports/basketball/nba/standings"
+
+
+logger = logging.getLogger(__name__)
 
 
 def estimate_ratings(ppg: float, opp_ppg: float) -> Tuple[float, float, float]:
@@ -142,12 +147,17 @@ class ESPNProvider(NBADataProvider):
                         teams_dict[abbreviation] = team
                         teams_dict[name] = team
         except Exception as e:
-            print(f"Warning: Failed to fetch live standings ({e}). Fallback to standard league defaults.")
+            logger.warning("A tabella nem tölthető le: %s", e)
 
         if teams_dict:
             self._standings_cache = teams_dict
             self._standings_timestamp = now
-        return teams_dict
+            return teams_dict
+        if self._standings_cache:
+            # A csapatmutatók lassan változnak (nem árak), ezért a legutóbbi sikeres tabella használható.
+            logger.warning("Az ESPN tabella nem elérhető, a legutóbbi sikeres változat marad használatban.")
+            return self._standings_cache
+        return {}
 
     async def get_today_games(self, date_str: Optional[str] = None) -> List[Game]:
         """Fetch games from ESPN scoreboard API."""
@@ -166,19 +176,19 @@ class ESPNProvider(NBADataProvider):
 
         try:
             resp = await self.client.get(ESPN_SCOREBOARD_URL, params=params)
-            if resp.status_code == 200:
-                data = resp.json()
-                events = data.get("events", [])
-                for ev in events:
-                    g = self._parse_event_to_game(ev, standings)
-                    if g:
-                        games.append(g)
         except Exception as e:
-            print(f"Error fetching ESPN scoreboard: {e}")
-
-        # If empty or failed (e.g. offline test), return fallback games
-        if not games:
-            games = self._generate_fallback_games()
+            raise DataSourceError(f"Az ESPN eredményjelző nem érhető el ({type(e).__name__}).") from e
+        if resp.status_code != 200:
+            raise DataSourceError(f"Az ESPN eredményjelző {resp.status_code} állapotkóddal válaszolt.")
+        try:
+            events = resp.json().get("events", [])
+        except ValueError as e:
+            raise DataSourceError("Az ESPN eredményjelző válasza nem értelmezhető.") from e
+        for ev in events:
+            g = self._parse_event_to_game(ev, standings)
+            if g:
+                games.append(g)
+        # Üres lista = ma nincs meccs; ez érvényes válasz, nem hiba.
 
         self._scoreboard_cache[cache_key] = {"time": now, "games": games}
         return games
@@ -239,26 +249,27 @@ class ESPNProvider(NBADataProvider):
                 away_is_b2b=False
             )
         except Exception as e:
-            print(f"Error parsing event: {e}")
+            logger.warning("Egy ESPN esemény nem értelmezhető: %s", e)
             return None
 
     def _create_team_from_raw(self, raw_c: Dict[str, Any]) -> Team:
+        """A tabellában nem szereplő csapat: csak a scoreboard adatai; a mutatók nem valódiak (has_ratings=False)."""
         t_data = raw_c.get("team", {})
-        t_id = str(t_data.get("id"))
+        record = (raw_c.get("records") or [{}])[0].get("summary", "0-0")
+        try:
+            wins, losses = (int(x) for x in record.split("-")[:2])
+        except ValueError:
+            wins = losses = 0
         return Team(
-            id=t_id,
+            id=str(t_data.get("id")),
             name=t_data.get("name", "Team"),
             display_name=t_data.get("displayName", "Team"),
             abbreviation=t_data.get("abbreviation", "NBA"),
-            logo=t_data.get("logo") or t_data.get("logos", [{}])[0].get("href", ""),
-            record=raw_c.get("records", [{}])[0].get("summary", "0-0"),
-            wins=10,
-            losses=5,
-            points_per_game=113.0,
-            points_allowed_per_game=111.0,
-            ortg=114.0,
-            drtg=112.0,
-            pace=99.0
+            logo=t_data.get("logo") or (t_data.get("logos") or [{}])[0].get("href", ""),
+            record=record,
+            wins=wins,
+            losses=losses,
+            has_ratings=False,
         )
 
     async def get_game_details(self, game_id: str) -> Optional[Game]:
@@ -275,6 +286,7 @@ class ESPNProvider(NBADataProvider):
             return None
 
         # Fetch detailed summary
+        summary_ok = False
         try:
             resp = await self.client.get(ESPN_SUMMARY_URL, params={"event": game_id})
             if resp.status_code == 200:
@@ -307,6 +319,8 @@ class ESPNProvider(NBADataProvider):
                 
                 target_game.injuries_home = injuries_home
                 target_game.injuries_away = injuries_away
+                target_game.injuries_known = True
+                summary_ok = True
 
                 # Parse pickcenter / odds details: csak akkor írja felül az árakat, ha van használható adat
                 pickcenter = data.get("pickcenter", [])
@@ -315,88 +329,8 @@ class ESPNProvider(NBADataProvider):
                     target_game.odds = detailed_odds
 
         except Exception as e:
-            print(f"Error fetching game summary for {game_id}: {e}")
+            logger.warning("A meccs részletes adata nem tölthető le (%s): %s", game_id, e)
 
-        self._summary_cache[game_id] = {"time": now, "game": target_game}
+        if summary_ok:  # sikertelen lekérést nem őrzünk meg, a következő kérés újrapróbálja
+            self._summary_cache[game_id] = {"time": now, "game": target_game}
         return target_game
-
-    def _generate_fallback_games(self) -> List[Game]:
-        """High-fidelity fallback games when network is unavailable."""
-        return [
-            Game(
-                id="401909966",
-                date="2026-11-12T00:00:00Z",
-                venue="Gainbridge Fieldhouse, Indianapolis",
-                status="scheduled",
-                period=0,
-                home_team=Team(
-                    id="11", name="Pacers", display_name="Indiana Pacers", abbreviation="IND",
-                    logo="https://a.espncdn.com/i/teamlogos/nba/500/ind.png",
-                    record="6-4", conference_rank=5, wins=6, losses=4,
-                    points_per_game=116.2, points_allowed_per_game=114.5,
-                    ortg=116.5, drtg=115.0, pace=101.2
-                ),
-                away_team=Team(
-                    id="27", name="Wizards", display_name="Washington Wizards", abbreviation="WAS",
-                    logo="https://a.espncdn.com/i/teamlogos/nba/500/was.png",
-                    record="2-7", conference_rank=14, wins=2, losses=7,
-                    points_per_game=108.4, points_allowed_per_game=122.1,
-                    ortg=107.5, drtg=120.8, pace=100.5
-                ),
-                odds=OddsItem(
-                    provider="DraftKings",
-                    spread=-6.5,
-                    spread_home_odds=1.91,
-                    spread_away_odds=1.91,
-                    over_under=228.5,
-                    over_odds=1.91,
-                    under_odds=1.91,
-                    moneyline_away=3.20,
-                    moneyline_home=1.38,
-                    timestamp="2026-11-11T20:00:00Z"
-                ),
-                injuries_home=[
-                    Injury(player_name="Aaron Nesmith", position="SF", status="Out", detail="Ankle sprain")
-                ],
-                injuries_away=[
-                    Injury(player_name="Malcolm Brogdon", position="PG", status="Questionable", detail="Thumb surgery")
-                ]
-            ),
-            Game(
-                id="401909967",
-                date="2026-11-12T00:30:00Z",
-                venue="Madison Square Garden, New York",
-                status="scheduled",
-                period=0,
-                home_team=Team(
-                    id="18", name="Knicks", display_name="New York Knicks", abbreviation="NY",
-                    logo="https://a.espncdn.com/i/teamlogos/nba/500/ny.png",
-                    record="7-4", conference_rank=4, wins=7, losses=4,
-                    points_per_game=115.8, points_allowed_per_game=110.2,
-                    ortg=117.2, drtg=111.5, pace=97.5
-                ),
-                away_team=Team(
-                    id="5", name="Cavaliers", display_name="Cleveland Cavaliers", abbreviation="CLE",
-                    logo="https://a.espncdn.com/i/teamlogos/nba/500/cle.png",
-                    record="11-0", conference_rank=1, wins=11, losses=0,
-                    points_per_game=122.4, points_allowed_per_game=110.1,
-                    ortg=123.0, drtg=109.8, pace=100.2
-                ),
-                odds=OddsItem(
-                    provider="DraftKings",
-                    spread=-2.5,
-                    spread_home_odds=1.91,
-                    spread_away_odds=1.91,
-                    over_under=222.5,
-                    over_odds=1.91,
-                    under_odds=1.91,
-                    moneyline_away=2.15,
-                    moneyline_home=1.74,
-                    timestamp="2026-11-11T20:00:00Z"
-                ),
-                injuries_home=[
-                    Injury(player_name="Mitchell Robinson", position="C", status="Out", detail="Ankle surgery rehab")
-                ],
-                injuries_away=[]
-            )
-        ]

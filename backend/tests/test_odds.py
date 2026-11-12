@@ -15,9 +15,17 @@ SCOREBOARD = json.loads((FIXTURES / "espn_scoreboard_20261112.json").read_text(e
 PICKCENTER = json.loads((FIXTURES / "espn_pickcenter_401909977.json").read_text(encoding="utf-8"))
 
 
+def rated_team(competitor):
+    """Egységes, értékelhető csapat (minden csapat azonos), hogy a modell-tesztek ne a tabellától függjenek."""
+    t = competitor["team"]
+    return Team(id=t["id"], name=t["name"], display_name=t["displayName"], abbreviation=t["abbreviation"], logo=t.get("logo"),
+                points_per_game=113.0, points_allowed_per_game=111.0, ortg=114.0, drtg=112.0, pace=99.0)
+
+
 def game_for(short_name):
     ev = next(e for e in SCOREBOARD["events"] if e["shortName"] == short_name)
-    game = ESPNProvider()._parse_event_to_game(ev, {})
+    standings = {c["id"]: rated_team(c) for c in ev["competitions"][0]["competitors"]}
+    game = ESPNProvider()._parse_event_to_game(ev, standings)
     assert game is not None
     return game
 

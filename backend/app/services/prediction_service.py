@@ -1,5 +1,6 @@
 import time
 from typing import List, Optional, Any
+from app.errors import InsufficientDataError
 from app.models.schemas import Game, GameAnalysis, PickRecommendation
 from app.quant.ratings import calculate_matchup_ratings
 from app.quant import calibration
@@ -17,6 +18,8 @@ from app.quant.ev_calculator import (
 class PredictionService:
     def analyze_game(self, game: Game) -> GameAnalysis:
         """Complete quantitative analysis and betting edge generation for an NBA game."""
+        if not (game.home_team.has_ratings and game.away_team.has_ratings):
+            raise InsufficientDataError("Ehhez a meccshez nincs elérhető csapatstatisztika (az ESPN tabella nem tartalmazza a csapatokat), ezért nem értékelhető.")
         matchup_data = calculate_matchup_ratings(
             home_team=game.home_team,
             away_team=game.away_team,
@@ -43,6 +46,8 @@ class PredictionService:
         picks = self._evaluate_markets(game, matchup_data, sim_result)
 
         key_factors = []
+        if not game.injuries_known:
+            key_factors.append("A sérüléslista nem érhető el, a modell hiányzók nélkül számol.")
         if matchup_data["uncertainty"] > 0.25:
             key_factors.append(f"Magas bizonytalanság sérülések miatt (index: {matchup_data['uncertainty']})")
         if matchup_data["home_injury_penalty"] > 2.0:
