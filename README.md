@@ -47,7 +47,18 @@ cd backend
 source venv/bin/activate   # vagy ./venv/bin/python
 python run.py
 ```
-A backend alapértelmezetten a `http://localhost:8000` címen indul el, és automatikusan kiszolgálja mind a REST API-t (`/api/...`), mind az elkészült frontend felületet.
+A backend alapértelmezetten a `http://127.0.0.1:8000` címen indul el (csak a helyi gépről érhető el), és kiszolgálja mind a REST API-t (`/api/...`), mind az elkészült frontend felületet (`cd frontend && npm run build`).
+
+**Konfiguráció (környezeti változók)**
+
+| Változó | Alapérték | Jelentés |
+|---|---|---|
+| `HOST` | `127.0.0.1` | Figyelt cím. Hálózatra nyitás: `0.0.0.0` |
+| `PORT` | `8000` | Figyelt port |
+| `API_WRITE_TOKEN` | nincs | Ha be van állítva, az írás (tipp rögzítése, elszámolás) `Authorization: Bearer <token>` fejlécet kér, bárhonnan. A webfelület nem küld tokent, ezért token módban az írás csak szkriptből (pl. `curl`) használható. |
+| `CORS_ORIGINS` | `localhost` / `127.0.0.1` a 3000-es és 8000-es porton | Engedélyezett böngészős eredetek, vesszővel elválasztva |
+
+**Írásvédelem:** token nélkül írni csak a helyi gépről lehet, és csak olyan kérésből, amely nem idegen weboldalról (cross-origin) és nem DNS-rebinding úton érkezik. Fordított proxy mögött a kliens címe a proxy címe, ilyenkor mindenképp állítsd be az `API_WRITE_TOKEN`-t. Az olvasó végpontok nyitottak.
 
 ### 3. Frontend Fejlesztői Mód (Opcionális)
 Ha a frontend forráskódját módosítani szeretnéd:

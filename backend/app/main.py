@@ -1,10 +1,12 @@
 import os
 from datetime import date as date_cls, datetime, timedelta, timezone
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from app.providers.espn import ESPNProvider
 from app.services.prediction_service import PredictionService
+from app.security import allowed_origins, require_write_access
+from app.services.settlement import parse_pick_id
 from app.services.tracker_service import TrackerService, TrackerStorageError
 from fastapi.responses import JSONResponse
 from app.models.schemas import (
@@ -13,7 +15,8 @@ from app.models.schemas import (
     PickRecommendation,
     HistoricalPick,
     PerformanceStats,
-    Team
+    Team,
+    TrackRequest,
 )
 
 app = FastAPI(
@@ -22,13 +25,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS setup for web and mobile clients
+# CORS: csak a megadott böngészős eredetek (CORS_ORIGINS), süti/hitelesítő adat nélkül.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=allowed_origins(),
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 @app.exception_handler(TrackerStorageError)
@@ -50,7 +53,7 @@ async def health_check():
     }
 
 @app.get("/api/games", response_model=List[Game])
-async def get_games(date: Optional[str] = None):
+async def get_games(date: Optional[str] = Query(None, pattern=r"^\d{8}$")):
     """Retrieve today's games or games on a specific date (YYYYMMDD)."""
     games = await provider.get_today_games(date_str=date)
     return games
@@ -113,22 +116,37 @@ async def get_top_value_picks():
     top_picks.sort(key=lambda x: x.ev, reverse=True)
     return top_picks[:8]
 
-@app.post("/api/picks/track")
-async def track_pick(pick: PickRecommendation, units: float = 1.0):
-    """Add a pick to the user's tracked paper-trading portfolio."""
-    # Look-ahead védelem: az indulás után rögzített tipp már az eredmény ismeretében születhetne.
+def _has_started(game: Game) -> bool:
+    """Igaz, ha a meccs már elkezdődött (vagy az időpontja nem értelmezhető): ilyenkor nem rögzíthető tipp."""
+    if game.status != "scheduled":
+        return True
     try:
-        start = datetime.fromisoformat(pick.game_date.replace("Z", "+00:00"))
+        start = datetime.fromisoformat(game.date.replace("Z", "+00:00"))
     except ValueError:
-        raise HTTPException(status_code=422, detail="A meccs időpontja nem értelmezhető, a tipp nem rögzíthető.")
+        return True
     if start.tzinfo is None:
         start = start.replace(tzinfo=timezone.utc)
-    if start <= datetime.now(timezone.utc):
+    return start <= datetime.now(timezone.utc)
+
+@app.post("/api/picks/track", dependencies=[Depends(require_write_access)])
+async def track_pick(req: TrackRequest):
+    """Tipp rögzítése papírkereskedésként. Az árat, a valószínűséget és az időpontot a szerver számolja újra."""
+    parsed = parse_pick_id(req.pick_id)
+    if not parsed:
+        raise HTTPException(status_code=422, detail="Ismeretlen tipp-azonosító.")
+    game = await provider.get_game_details(parsed[0])
+    if game is None:
+        raise HTTPException(status_code=404, detail="Mérkőzés nem található")
+    # Look-ahead védelem: az indulás után rögzített tipp már az eredmény ismeretében születhetne.
+    if _has_started(game):
         raise HTTPException(status_code=409, detail="A meccs már elkezdődött, utólag nem rögzíthető tipp.")
-    recorded = tracker_service.record_pick(pick, units=units)
+    pick = next((p for p in prediction_service.analyze_game(game).picks if p.id == req.pick_id), None)
+    if pick is None:
+        raise HTTPException(status_code=404, detail="Ez a piac nem elérhető (nincs piaci ár).")
+    recorded = tracker_service.record_pick(pick, units=req.units)
     return {"message": "Tipp sikeresen rögzítve", "pick": recorded}
 
-@app.post("/api/history/settle")
+@app.post("/api/history/settle", dependencies=[Depends(require_write_access)])
 async def settle_history():
     """A függő tippek lezárása a lejátszott meccsek végeredménye alapján (ESPN)."""
     pending = [p for p in tracker_service.get_history() if p.result == "PENDING"]

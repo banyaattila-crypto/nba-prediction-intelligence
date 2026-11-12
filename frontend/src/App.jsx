@@ -9,7 +9,7 @@ import MethodologyModal from './components/MethodologyModal'
 import Evidence from './components/Evidence'
 import { Legend, Loading, Notice } from './components/ui'
 import { errorText, postJson, useResource } from './lib/api'
-import { isFlagged } from './lib/format'
+import { isFlagged, num } from './lib/format'
 
 const today = () => {
   const s = new Date().toLocaleDateString('hu-HU', { weekday: 'long', month: 'long', day: 'numeric' })
@@ -73,9 +73,10 @@ export default function App() {
   const trackPick = useCallback(
     async (pick) => {
       try {
-        await postJson('/api/picks/track', pick)
+        // A szerver az árat és a valószínűséget újraszámolja, a rögzített érték eltérhet a megjelenítettől.
+        const { pick: recorded } = await postJson('/api/picks/track', { pick_id: pick.id, units: 1 })
         await Promise.all([history.reload(), performance.reload()])
-        showToast(`Rögzítve: ${pick.selection}`)
+        showToast(`Rögzítve: ${recorded.selection}, szorzó ${num(recorded.odds, 2)}`)
       } catch (e) {
         showToast(`A rögzítés nem sikerült: ${e.message}`, 'error')
       }

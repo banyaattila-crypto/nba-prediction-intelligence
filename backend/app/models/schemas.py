@@ -79,6 +79,11 @@ class PickRecommendation(BaseModel):
     timestamp: str
     result: Optional[str] = "PENDING"  # 'WON', 'LOST', 'PUSH', 'PENDING'
 
+class TrackRequest(BaseModel):
+    """Tipp rögzítése: a kliens csak az azonosítót és a tétet adja, minden más adatot a szerver számol."""
+    pick_id: str = Field(min_length=3, max_length=64)
+    units: float = Field(1.0, gt=0, le=5.0, allow_inf_nan=False)
+
 class MonteCarloSimulationResult(BaseModel):
     simulations_count: int = 10000
     home_win_prob: float

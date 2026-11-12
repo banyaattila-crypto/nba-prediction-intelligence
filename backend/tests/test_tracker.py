@@ -135,25 +135,6 @@ import app.main as main
 from app.models.schemas import OddsItem
 
 
-@pytest.fixture
-def client(svc, monkeypatch):
-    monkeypatch.setattr(main, "tracker_service", svc)
-    return TestClient(main.app)
-
-
-@pytest.mark.parametrize("game_date,status", [
-    ("2020-01-01T00:00:00Z", 409),   # már lejátszott
-    ("2999-01-01T00:00Z", 200),      # még nem kezdődött el (ESPN formátum)
-    ("nem-datum", 422),
-])
-def test_track_checks_game_start(client, svc, game_date, status):
-    pick = make_pick()
-    pick.game_date = game_date
-    r = client.post("/api/picks/track", json=pick.model_dump())
-    assert r.status_code == status
-    assert len(svc.get_history()) == (1 if status == 200 else 0)
-
-
 class StubProvider:
     def __init__(self, games):
         self.games = games
